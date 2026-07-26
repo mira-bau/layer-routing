@@ -1,0 +1,12 @@
+# Non-PyTorch runtime packages used by data preparation and analysis.
+#
+# Do not install this file blindly in Colab. First run:
+#
+#   python scripts/check_env.py
+#
+# Then install only the packages reported as missing. Do not reinstall PyTorch
+# unless you intentionally control the runtime.
+numpy
+matplotlib
+pyyaml
+tokenizers

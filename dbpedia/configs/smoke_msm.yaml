@@ -1,0 +1,29 @@
+# Tiny synthetic MSM smoke config. This is not a paper experiment.
+task: msm
+model: saab
+seed: 42
+device: auto
+allow_cpu: false
+synthetic:
+  vocab_size: 64
+  field_vocab_size: 6
+  mask_field_id: 5
+  seq_len: 16
+  title_field_id: 4
+  content_field_id: 3
+  mask_probability: 0.15
+model_config:
+  d_model: 32
+  num_layers: 2
+  num_heads: 4
+  ff_dim: 64
+  dropout: 0.0
+training:
+  max_steps: 20
+  microbatch_size: 4
+  learning_rate: 0.001
+  weight_decay: 0.0
+  log_every_steps: 1
+  checkpoint_every_steps: 0
+diagnostics:
+  enabled: false

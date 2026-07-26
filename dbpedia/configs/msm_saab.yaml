@@ -1,0 +1,44 @@
+# Paper-scale DBpedia MSM SAAB config.
+# Fill data paths via CLI flags or by editing this file before running.
+task: msm
+model: saab
+seed: 42
+device: auto
+allow_cpu: false
+data:
+  train_jsonl: null
+  val_jsonl: null
+  tokenizer_json: null
+  max_records: null
+  train_sample_size: null
+  val_sample_size: null
+  sample_seed: null
+  max_length: 256
+  pad_token_id: 0
+  pad_field_id: 0
+  field_vocab_size: 6
+  mask_field_id: 5
+  num_labels: 5
+  mask_probability: 0.15
+model_config:
+  d_model: 768
+  num_layers: 4
+  num_heads: 6
+  ff_dim: 3072
+  dropout: 0.2
+  scale_embeddings: true
+training:
+  max_steps: 500
+  microbatch_size: 64
+  gradient_accumulation_steps: 8
+  learning_rate: 0.0001
+  lr_schedule: linear_warmup_cosine
+  warmup_steps: 50
+  min_lr_ratio: 0.1
+  weight_decay: 0.01
+  betas: [0.9, 0.999]
+  grad_clip: 1.0
+  log_every_steps: 10
+  eval_every_steps: 500
+  checkpoint_every_steps: 500
+  num_workers: 0

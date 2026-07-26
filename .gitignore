@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+
+# Datasets and generated artifacts (not committed; see README for sources)
+/data/
+/dbpedia/data/
+/pubmed/data/
+/runs/
+/outputs/
+/results/
+/notebooks/
+*.zip
+*.tgz
+*.jsonl
+*.ipynb
+*.pt
+*.pth
+tokenizer.json
+
+# OS
+.DS_Store

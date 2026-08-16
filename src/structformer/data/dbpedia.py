@@ -10,6 +10,7 @@ import csv
 import json
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
+from itertools import chain
 from pathlib import Path
 from typing import Any
 
@@ -62,21 +63,39 @@ def read_dbpedia_csv(path: str | Path) -> list[DBpediaRow]:
 
 
 def iter_dbpedia_csv(path: str | Path) -> Iterable[DBpediaRow]:
-    """Stream local DBpedia CSV rows with columns `label,title,content`."""
+    """Stream headered or original headerless DBpedia CSV rows."""
 
     with Path(path).open("r", encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle)
-        missing = [column for column in CSV_COLUMNS if column not in (reader.fieldnames or [])]
-        if missing:
+        reader = csv.reader(handle)
+        first = next(reader, None)
+        if first is None:
+            raise ValueError("DBpedia CSV is empty")
+        normalized_first = tuple(value.strip().lower() for value in first)
+        if normalized_first == CSV_COLUMNS:
+            data_rows = reader
+        elif any(value in CSV_COLUMNS for value in normalized_first):
+            missing = [column for column in CSV_COLUMNS if column not in normalized_first]
             raise ValueError(f"DBpedia CSV is missing required columns: {missing}")
+        else:
+            data_rows = chain([first], reader)
 
-        for index, row in enumerate(reader):
+        record_index = 0
+        for line_index, values in enumerate(data_rows, start=1):
+            if not values or not any(value.strip() for value in values):
+                continue
+            if len(values) != len(CSV_COLUMNS):
+                raise ValueError(
+                    f"DBpedia CSV row {line_index} has {len(values)} columns; "
+                    f"expected {len(CSV_COLUMNS)} in label,title,content order"
+                )
+            row = dict(zip(CSV_COLUMNS, values))
             yield DBpediaRow(
-                row_id=f"row_{index}",
+                row_id=f"row_{record_index}",
                 label=(row.get("label") or "").strip(),
                 title=(row.get(TITLE_FIELD) or "").strip(),
                 content=(row.get(CONTENT_FIELD) or "").strip(),
             )
+            record_index += 1
 
 
 def train_dbpedia_tokenizer(

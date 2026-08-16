@@ -27,7 +27,7 @@ class ModelOutput:
 
 
 class StructuredTransformerModel(nn.Module):
-    """Shared backbone plus task head for baseline or SAAB."""
+    """Shared backbone plus task head for baseline, SAAB, or CASA."""
 
     def __init__(self, config: TransformerConfig) -> None:
         super().__init__()
@@ -65,13 +65,15 @@ class StructuredTransformerModel(nn.Module):
 
         fixed_bias: torch.Tensor | list[torch.Tensor | None] | None = None
         if self.config.variant == "saab":
-            # Bias-content control: build the bias from a scrambled grouping while
-            # the embeddings above keep the true field_ids. Isolates whether the
-            # effect needs a bias aligned with real structure.
+            # Bias-content control: build the bias from a grouping shuffled only
+            # across attended positions. Embeddings keep the unshuffled input
+            # field_ids, including the MSM mask-field ID at selected positions.
             bias_field_ids = field_ids
             if self.config.saab_shuffle_bias:
                 bias_field_ids = shuffle_field_ids_for_bias(
-                    field_ids, self.config.saab_shuffle_seed
+                    field_ids,
+                    attention_mask,
+                    self.config.saab_shuffle_seed,
                 )
             base_bias = build_saab_bias(
                 bias_field_ids,
@@ -117,4 +119,7 @@ class StructuredTransformerModel(nn.Module):
             "total": sum(param.numel() for param in self.parameters()),
             "trainable": sum(param.numel() for param in self.parameters() if param.requires_grad),
         }
+        casa = sum(param.numel() for name, param in self.named_parameters() if ".casa." in name)
+        if casa:
+            counts["casa"] = casa
         return counts

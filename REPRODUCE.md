@@ -103,6 +103,12 @@ Shuffled-bias control at seeds 99 and 1001:
 --saab-shuffle-bias --saab-shuffle-seed 0
 ```
 
+For this control, MSM masking occurs first. The bias-construction IDs are then
+permuted deterministically only among valid non-padding positions in each
+example. This preserves the valid-position ID multiset and the number and
+magnitude of positive valid-token bias pairs, while the field embeddings retain
+the unpermuted masked IDs.
+
 For example:
 
 ```bash
@@ -168,3 +174,30 @@ metrics, and checkpoints. Preserve these files when archiving a reported run.
 Use `scripts/diag_attention.py` for per-layer SFM, entropy, and field-to-field
 attention on paired final checkpoints. Use `scripts/make_tables.py` to collect
 training and validation metrics from compatible run directories.
+
+## 8. Reviewer-facing analyses
+
+The following scripts operate on retained run artifacts and local prepared data;
+they do not download datasets. Use the paired final checkpoints and record the
+resulting manifests with the outputs.
+
+```bash
+# Paired SFM statistics, bootstrap CIs, permutation tests, and length associations
+PYTHONPATH=src python scripts/analyze_paired_sfm_length.py --help
+
+# Opportunity-normalized SFM
+PYTHONPATH=src python scripts/analyze_opportunity_normalized_sfm.py --help
+
+# Exact-length standardization across DBpedia and PubMed
+PYTHONPATH=src python scripts/analyze_length_standardized_sfm.py --help
+
+# Untouched DBpedia test confirmation using retained fixed checkpoints
+PYTHONPATH=src python scripts/analyze_untouched_dbpedia_test.py --help
+
+# Computational-overhead benchmark
+PYTHONPATH=src python scripts/benchmark_computational_overhead.py --help
+```
+
+Each command exposes explicit local input and output paths. Inspect `--help`
+before launching a paper-scale run, and preserve its generated configuration,
+manifest, metrics, and hash records with the analysis output.

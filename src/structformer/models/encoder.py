@@ -8,6 +8,7 @@ import torch
 from torch import nn
 
 from structformer.models.attention import StructuralSelfAttention
+from structformer.models.bias import CASABias
 from structformer.models.config import TransformerConfig
 
 
@@ -37,6 +38,12 @@ class TransformerEncoderLayer(nn.Module):
         )
         self.dropout2 = nn.Dropout(config.dropout)
 
+        self.casa = (
+            CASABias(config.d_model, config.field_vocab_size, config.casa_rank, config.casa_lambda_init)
+            if config.variant == "casa"
+            else None
+        )
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -49,6 +56,8 @@ class TransformerEncoderLayer(nn.Module):
         attention_input = self.norm1(hidden_states)
 
         structural_bias = fixed_structural_bias
+        if self.casa is not None:
+            structural_bias = self.casa(attention_input, field_ids)
 
         attention_output = self.attention(
             attention_input,

@@ -7,8 +7,8 @@ implementation. Configuration files are the executable source of truth.
 
 Baseline and SAAB share the same token embeddings, field embeddings,
 positional embeddings, Transformer backbone, MSM prediction head, and
-learnable parameter count. Their only intended difference is the attention
-bias path:
+learnable parameter count. They share visible field-ID inputs, learned components, and the training
+protocol; SAAB additionally changes the attention-bias path:
 
 - **Baseline:** field labels enter through field embeddings.
 - **SAAB:** the same field labels also form a fixed attention-score bias of
@@ -19,10 +19,12 @@ layer with weight `1.0`.
 
 ## Masked Structure Modeling
 
-MSM selects 15% of the positions in each represented field, replaces their
-field IDs with the field-mask ID, and predicts the original field IDs. Token
-IDs remain visible. The optimization objective is mean cross-entropy over the
-masked positions.
+For each micro-batch and each field ID represented among non-padding positions,
+MSM samples without replacement min(n, max(1, round(0.15n))) positions, replaces
+their field IDs with one shared mask-field ID, and predicts the original IDs.
+The masked IDs are supplied to both field embeddings and the SAAB bias; original
+IDs are targets only. Token IDs remain visible, and the objective is mean
+cross-entropy over selected positions.
 
 ## DBpedia data
 
@@ -31,7 +33,8 @@ masked positions.
 - Fields: title and content.
 - Split: a `numpy.random.RandomState(42)` permutation selects 490,000 training
   rows and 70,000 validation rows.
-- The benchmark test split is not used.
+- The benchmark test split is excluded from training, validation, and checkpoint
+selection; the retained seed-1001 checkpoints support the documented untouched-test confirmation.
 - Maximum sequence length: 256.
 
 `dbpedia/scripts/split_dbpedia.py` records source and output hashes in a split

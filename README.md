@@ -1,12 +1,12 @@
-# Computation Graph Position Shapes How Transformer Layers Divide Their Labor
+# How Structural Information Shapes Layer-wise Attention Routing in Transformers
 
 Reference implementation for the Baseline and Structure-Aware Attention Bias
 (SAAB) experiments reported in the paper.
 
-This repository compares two Transformers with the same backbone, prediction
-head, field embeddings, and learnable parameter count. The Baseline receives
-field information through its input embeddings. SAAB also supplies the same
-information directly to attention as a fixed, parameter-free bias. Both models
+This repository compares two Transformers with the same visible field-ID inputs, backbone, prediction head, field embeddings, and
+learnable parameter count. The Baseline receives field information through its
+input embeddings. SAAB additionally constructs a fixed pairwise relation from
+the visible post-masking field IDs and adds it to the attention logits. Both models
 are trained with Masked Structure Modeling (MSM), which masks field labels and
 asks the model to recover them.
 
@@ -62,7 +62,7 @@ repository.
 
 The DBpedia experiments divide the original 560,000-example training split into
 490,000 training examples and 70,000 validation examples with a deterministic
-random split using seed 42. The benchmark test split is not used:
+random split using seed 42. The benchmark test split is excluded from training, validation, and checkpoint selection; it is reserved for the documented untouched confirmatory analysis:
 
 ```bash
 python dbpedia/scripts/split_dbpedia.py \
@@ -162,7 +162,7 @@ PYTHONPATH=src pytest -q
 
 ```bibtex
 @unpublished{benamara2026saab,
-  title  = {Computation Graph Position Shapes How Transformer Layers Divide Their Labor},
+  title  = {How Structural Information Shapes Layer-wise Attention Routing in Transformers},
   author = {Benamara, Amira and Sadeghzadeh, Arezoo and Kahraman, Fatih},
   year   = {2026},
   note   = {Manuscript under review}

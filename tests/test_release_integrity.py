@@ -23,6 +23,25 @@ def test_release_contains_data_loaders() -> None:
     assert (REPO_ROOT / "src/structformer/data/msm_jsonl.py").is_file()
 
 
+def test_release_contains_revised_manuscript_analysis_paths() -> None:
+    required = (
+        "dbpedia/scripts/prepare_external_dbpedia_split.py",
+        "scripts/analyze_initialization_sensitivity.py",
+        "scripts/analyze_individual_token_attention.py",
+        "scripts/analyze_opportunity_normalized_sfm.py",
+        "scripts/analyze_paired_sfm_length.py",
+        "scripts/analyze_untouched_dbpedia_test.py",
+        "scripts/benchmark_computational_overhead.py",
+    )
+    for relative_path in required:
+        assert (REPO_ROOT / relative_path).is_file(), relative_path
+
+
+def test_release_documents_reported_environment() -> None:
+    assert (REPO_ROOT / "PAPER_ENVIRONMENT.md").is_file()
+    assert (REPO_ROOT / "requirements-paper.txt").is_file()
+
+
 def test_baseline_and_saab_have_equal_parameter_counts() -> None:
     torch = pytest.importorskip("torch")
     from structformer.models import StructuredTransformerModel, TransformerConfig

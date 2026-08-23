@@ -63,7 +63,6 @@ class TrainMSMTests(unittest.TestCase):
                     "num_heads": 4,
                     "ff_dim": 32,
                     "dropout": 0.0,
-                    "casa_rank": 4,
                     "scale_embeddings": True,
                 },
                 "training": {
@@ -145,15 +144,6 @@ class TrainMSMTests(unittest.TestCase):
             self.assertEqual(baseline_rows, saab_rows)
             self.assertEqual(baseline_batch, saab_batch)
             self.assertEqual(baseline_model, saab_model)
-
-            casa_run_dir = tmp_path / "run_casa"
-            casa_config = deepcopy(config)
-            casa_config["model"] = "casa"
-            with redirect_stdout(io.StringIO()):
-                run_train_msm(casa_config, run_dir=casa_run_dir)
-
-            casa_rows = json.loads((casa_run_dir / "sample_rows.json").read_text(encoding="utf-8"))
-            self.assertEqual(baseline_rows["row_ids"], casa_rows["row_ids"])
 
 
 if __name__ == "__main__":

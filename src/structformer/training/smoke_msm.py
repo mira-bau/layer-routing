@@ -39,7 +39,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "num_heads": 4,
         "ff_dim": 64,
         "dropout": 0.0,
-        "casa_rank": 4,
     },
     "training": {
         "max_steps": 20,
@@ -93,7 +92,6 @@ def run_smoke_msm(config: dict[str, Any], *, run_dir: str | Path) -> Path:
         num_heads=int(model_cfg["num_heads"]),
         ff_dim=int(model_cfg["ff_dim"]),
         dropout=float(model_cfg["dropout"]),
-        casa_rank=int(model_cfg["casa_rank"]),
     )
     model = StructuredTransformerModel(model_config).to(device)
     optimizer = torch.optim.AdamW(
@@ -218,7 +216,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run a synthetic MSM smoke-training loop.")
     parser.add_argument("--config", type=Path, default=None, help="Optional JSON/YAML config.")
     parser.add_argument("--run-dir", type=Path, default=Path("runs/msm_smoke"), help="Output run directory.")
-    parser.add_argument("--model", choices=["baseline", "saab", "casa"], default=None, help="Override model variant.")
+    parser.add_argument("--model", choices=["baseline", "saab"], default=None, help="Override model variant.")
     parser.add_argument("--max-steps", type=int, default=None, help="Override max training steps.")
     parser.add_argument("--allow-cpu", action="store_true", help="Allow CPU for this tiny smoke run.")
     args = parser.parse_args(argv)

@@ -14,7 +14,9 @@ dependencies = []
 runtime = [
   "numpy",
   "matplotlib",
+  "pandas",
   "pyyaml",
+  "scikit-learn",
   "tokenizers",
 ]
 dev = [

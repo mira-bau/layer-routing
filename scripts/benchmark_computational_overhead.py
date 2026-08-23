@@ -117,7 +117,6 @@ def _make_model(torch_module, args, variant: str, max_length: int, device):
         ff_dim=args.ff_dim,
         dropout=args.dropout,
         pad_token_id=0,
-        casa_rank=8,
         scale_embeddings=True,
         saab_field_weight=1.0,
     )

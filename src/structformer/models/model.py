@@ -27,7 +27,7 @@ class ModelOutput:
 
 
 class StructuredTransformerModel(nn.Module):
-    """Shared backbone plus task head for baseline, SAAB, or CASA."""
+    """Shared backbone plus task head for Baseline or SAAB."""
 
     def __init__(self, config: TransformerConfig) -> None:
         super().__init__()
@@ -115,11 +115,7 @@ class StructuredTransformerModel(nn.Module):
     def parameter_count(self) -> dict[str, int]:
         """Return parameter counts useful for run summaries."""
 
-        counts = {
+        return {
             "total": sum(param.numel() for param in self.parameters()),
             "trainable": sum(param.numel() for param in self.parameters() if param.requires_grad),
         }
-        casa = sum(param.numel() for name, param in self.named_parameters() if ".casa." in name)
-        if casa:
-            counts["casa"] = casa
-        return counts

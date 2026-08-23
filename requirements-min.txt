@@ -8,5 +8,7 @@
 # unless you intentionally control the runtime.
 numpy
 matplotlib
+pandas
 pyyaml
+scikit-learn
 tokenizers

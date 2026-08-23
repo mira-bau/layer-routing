@@ -1,0 +1,11 @@
+# Install PyTorch 2.11.0 for CUDA 12.8 manually; do not install it from here.
+# Python used for the reported runs: 3.12.13.
+numpy==2.0.2
+pandas==2.2.2
+PyYAML==6.0.3
+scikit-learn==1.6.1
+tokenizers==0.22.2
+
+# Figure-generation dependency; its exact version was not captured in the
+# recorded training environment and is intentionally not fabricated here.
+matplotlib

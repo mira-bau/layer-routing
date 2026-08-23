@@ -175,29 +175,163 @@ Use `scripts/diag_attention.py` for per-layer SFM, entropy, and field-to-field
 attention on paired final checkpoints. Use `scripts/make_tables.py` to collect
 training and validation metrics from compatible run directories.
 
-## 8. Reviewer-facing analyses
+## 8. Paired SFM, uncertainty, and length analysis
 
-The following scripts operate on retained run artifacts and local prepared data;
-they do not download datasets. Use the paired final checkpoints and record the
-resulting manifests with the outputs.
+Use the fixed seed-1001 final checkpoint pairs. This command evaluates the
+first 64 validation examples for the primary paired comparisons and a
+deterministic 2,336-record sample for the length analyses. It evaluates PubMed
+at both the primary 256-token cap and the configured 512-token maximum.
 
 ```bash
-# Paired SFM statistics, bootstrap CIs, permutation tests, and length associations
-PYTHONPATH=src python scripts/analyze_paired_sfm_length.py --help
-
-# Opportunity-normalized SFM
-PYTHONPATH=src python scripts/analyze_opportunity_normalized_sfm.py --help
-
-# Exact-length standardization across DBpedia and PubMed
-PYTHONPATH=src python scripts/analyze_length_standardized_sfm.py --help
-
-# Untouched DBpedia test confirmation using retained fixed checkpoints
-PYTHONPATH=src python scripts/analyze_untouched_dbpedia_test.py --help
-
-# Computational-overhead benchmark
-PYTHONPATH=src python scripts/benchmark_computational_overhead.py --help
+PYTHONPATH=src python scripts/analyze_paired_sfm_length.py \
+  --dbpedia-baseline-checkpoint runs/dbpedia_multiseed/baseline_seed1001/checkpoints/latest.pt \
+  --dbpedia-saab-checkpoint runs/dbpedia_multiseed/saab_seed1001/checkpoints/latest.pt \
+  --dbpedia-validation-jsonl /path/to/processed/dbpedia/val.jsonl \
+  --dbpedia-field-vocab-json /path/to/processed/dbpedia/field_vocab.json \
+  --pubmed-baseline-checkpoint runs/pubmed/baseline_seed1001/checkpoints/latest.pt \
+  --pubmed-saab-checkpoint runs/pubmed/saab_seed1001/checkpoints/latest.pt \
+  --pubmed-validation-jsonl /path/to/processed/pubmed/val.jsonl \
+  --pubmed-field-vocab-json /path/to/processed/pubmed/field_vocab.json \
+  --primary-examples 64 \
+  --length-sample-size 2336 \
+  --bootstrap-resamples 10000 \
+  --correlation-bootstrap-resamples 2000 \
+  --permutations 20000 \
+  --analysis-seed 1001 \
+  --device cuda \
+  --out-dir outputs/paired_sfm
 ```
 
-Each command exposes explicit local input and output paths. Inspect `--help`
-before launching a paper-scale run, and preserve its generated configuration,
-manifest, metrics, and hash records with the analysis output.
+Apply the field-opportunity adjustment to those retained per-example values:
+
+```bash
+PYTHONPATH=src python scripts/analyze_opportunity_normalized_sfm.py \
+  --analysis-dir outputs/paired_sfm \
+  --dbpedia-validation-jsonl /path/to/processed/dbpedia/val.jsonl \
+  --pubmed-validation-jsonl /path/to/processed/pubmed/val.jsonl \
+  --bootstrap-resamples 10000 \
+  --permutations 20000 \
+  --analysis-seed 1001 \
+  --out-dir outputs/opportunity_adjusted_sfm
+```
+
+Standardize both datasets to their exactly shared token lengths:
+
+```bash
+PYTHONPATH=src python scripts/analyze_length_standardized_sfm.py \
+  --dbpedia-csv outputs/paired_sfm/dbpedia/per_example_sfm.csv \
+  --pubmed-csv outputs/paired_sfm/pubmed/configured_length_per_example_sfm.csv \
+  --band-widths 1,2,5,10 \
+  --bootstrap-resamples 10000 \
+  --seed 1001 \
+  --output outputs/length_standardization.json
+```
+
+## 9. Untouched DBpedia test confirmation
+
+Encode the original 70,000-record benchmark test CSV with the retained training
+tokenizer. This does not retrain or modify the tokenizer.
+
+```bash
+PYTHONPATH=src python dbpedia/scripts/prepare_external_dbpedia_split.py \
+  --input-csv /path/to/dbpedia_csv/test.csv \
+  --tokenizer-json /path/to/processed/dbpedia/tokenizer.json \
+  --output-jsonl /path/to/processed/dbpedia/test.jsonl \
+  --manifest /path/to/processed/dbpedia/test_manifest.json \
+  --split-name test \
+  --max-length 256 \
+  --expected-records 70000
+```
+
+Run the predeclared 2,336-record reservoir confirmation with the retained
+seed-1001 checkpoints:
+
+```bash
+PYTHONPATH=src python scripts/analyze_untouched_dbpedia_test.py \
+  --baseline-checkpoint runs/dbpedia_multiseed/baseline_seed1001/checkpoints/latest.pt \
+  --saab-checkpoint runs/dbpedia_multiseed/saab_seed1001/checkpoints/latest.pt \
+  --test-jsonl /path/to/processed/dbpedia/test.jsonl \
+  --test-manifest /path/to/processed/dbpedia/test_manifest.json \
+  --field-vocab-json /path/to/processed/dbpedia/field_vocab.json \
+  --sample-size 2336 \
+  --bootstrap-resamples 10000 \
+  --permutations 20000 \
+  --analysis-seed 1001 \
+  --out-dir outputs/untouched_dbpedia_test
+```
+
+The qualitative individual-token figure uses an output-independent record
+selection from the same reservoir:
+
+```bash
+PYTHONPATH=src python scripts/analyze_individual_token_attention.py \
+  --baseline-checkpoint runs/dbpedia_multiseed/baseline_seed1001/checkpoints/latest.pt \
+  --saab-checkpoint runs/dbpedia_multiseed/saab_seed1001/checkpoints/latest.pt \
+  --test-jsonl /path/to/processed/dbpedia/test.jsonl \
+  --test-manifest /path/to/processed/dbpedia/test_manifest.json \
+  --field-vocab-json /path/to/processed/dbpedia/field_vocab.json \
+  --sample-size 2336 \
+  --analysis-seed 1001 \
+  --min-length 20 \
+  --max-length 30 \
+  --min-tokens-per-field 4 \
+  --layers 2,3 \
+  --top-changes 20 \
+  --device cuda \
+  --out-dir outputs/individual_token_attention
+```
+
+## 10. Exploratory initialization sensitivity
+
+Prepare a local CSV containing unrounded final SFM outcomes for the eight seed
+pairs. It may contain either `seed,delta_l2,delta_l3` or
+`seed,baseline_l2,baseline_l3,saab_l2,saab_l3`; an optional `pattern` column is
+retained for inspection. Then run:
+
+```bash
+PYTHONPATH=src python scripts/analyze_initialization_sensitivity.py \
+  --config dbpedia/configs/msm_dbpedia_full_recipe.yaml \
+  --validation-jsonl /path/to/processed/dbpedia/val.jsonl \
+  --final-outcomes-csv /path/to/local/final_sfm_by_seed.csv \
+  --seeds 0,7,42,99,123,256,1001,2024 \
+  --mask-seeds 101,202,303,404,505 \
+  --probe-examples 256 \
+  --probe-blocks 4 \
+  --vocab-size 30000 \
+  --device cpu \
+  --out-dir outputs/initialization_sensitivity
+```
+
+This analysis is descriptive over the same eight final outcomes and is not a
+validated predictor for new initializations.
+
+## 11. Computational-overhead benchmark
+
+Run this command on an NVIDIA A100-SXM4-40GB GPU. Omitting `--allow-tf32`
+keeps TF32 disabled; the script uses float32 without automatic mixed precision.
+
+```bash
+PYTHONPATH=src python scripts/benchmark_computational_overhead.py \
+  --device cuda \
+  --lengths 64,128,256 \
+  --batch-size 4 \
+  --inference-warmup 5 \
+  --inference-iterations 20 \
+  --training-warmup 2 \
+  --training-iterations 5 \
+  --repeats 5 \
+  --seed 2026 \
+  --vocab-size 30000 \
+  --field-vocab-size 6 \
+  --num-labels 5 \
+  --d-model 768 \
+  --num-layers 4 \
+  --num-heads 6 \
+  --ff-dim 3072 \
+  --dropout 0.2 \
+  --out-dir outputs/computational_overhead
+```
+
+All analysis outputs are local generated artifacts and remain excluded from the
+repository. Preserve their generated manifests and hash records with the local
+run archive.

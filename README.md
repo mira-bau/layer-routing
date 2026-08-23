@@ -14,7 +14,9 @@ The implementation includes the paper’s training variants and compact
 diagnostics for same-field mass (SFM), attention entropy, field-to-field
 attention, and MSM loss-gradient norms. See
 [PAPER_EXPERIMENT_SPEC.md](PAPER_EXPERIMENT_SPEC.md) for the exact method and
-[REPRODUCE.md](REPRODUCE.md) for the complete command sequence.
+[REPRODUCE.md](REPRODUCE.md) for the complete command sequence. The exact
+recorded software and hardware environment is documented in
+[PAPER_ENVIRONMENT.md](PAPER_ENVIRONMENT.md).
 
 ## Repository layout
 
@@ -42,6 +44,10 @@ source .venv/bin/activate
 pip install -e ".[runtime,dev]"
 python scripts/check_env.py
 ```
+
+For strict reconstruction of the recorded non-PyTorch package environment, use
+`requirements-paper.txt` after manually installing the reported PyTorch/CUDA
+build. The file does not install or replace PyTorch.
 
 Training selects CUDA first and Apple MPS second. CPU training is rejected by
 default; `--allow-cpu` is intended only for tests and tiny smoke runs. The

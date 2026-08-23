@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import torch
-from torch import nn
-from torch.nn import functional as F
 
 
 @dataclass(frozen=True)
@@ -90,27 +88,3 @@ def build_saab_bias(
     if time_ids is not None:
         bias = bias + _same_tag_bias(time_ids, weights.time)
     return bias.to(device=field_ids.device)
-
-
-class CASABias(nn.Module):
-    """Low-rank content-aware structural bias for one encoder layer."""
-
-    def __init__(self, d_model: int, num_fields: int, rank: int = 8, lambda_init: float = 1.0) -> None:
-        super().__init__()
-        self.content_proj = nn.Linear(d_model, rank, bias=False)
-        self.u = nn.Embedding(num_fields, rank)
-        self.v = nn.Embedding(num_fields, rank)
-        self.lambda_scale = nn.Parameter(torch.tensor(float(lambda_init)))
-
-    def forward(self, hidden_states: torch.Tensor, field_ids: torch.Tensor) -> torch.Tensor:
-        """Return scaled CASA bias with shape `[batch, seq, seq]`."""
-
-        projected = self.content_proj(hidden_states)
-        h = F.normalize(projected, p=2, dim=-1)
-        u = F.normalize(self.u(field_ids), p=2, dim=-1)
-        v = F.normalize(self.v(field_ids), p=2, dim=-1)
-
-        phi_u = h * u
-        phi_v = h * v
-        bias = torch.matmul(phi_u, phi_v.transpose(1, 2))
-        return self.lambda_scale * bias

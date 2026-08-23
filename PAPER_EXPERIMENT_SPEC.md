@@ -52,6 +52,10 @@ the original headerless CSV or an equivalent file with a
 - Maximum sequence length: 512.
 - Reported seeds: 42, 123, and 1001.
 
+The primary PubMed routing comparison evaluates the first 64 validation
+records with a 256-token evaluation cap. The configured-length sensitivity
+analysis reevaluates the same examples at the model maximum of 512 tokens.
+
 ## Shared paper-scale model and optimizer
 
 - 4 Transformer layers unless depth is explicitly varied
@@ -88,6 +92,31 @@ validation pass also performed when a run ends between these intervals.
 - Shuffled-bias control: seeds 99 and 1001.
 - Depth: 6, 8, and 12 layers at seeds 99 and 1001.
 - PubMed: seeds 42, 123, and 1001.
+- Opportunity-adjusted SFM: the fixed seed-1001 DBpedia and PubMed pairs,
+  including PubMed at both 256 and 512 evaluation tokens.
+- Untouched DBpedia test confirmation: the retained seed-1001 checkpoint pair
+  on a deterministic reservoir sample of 2,336 records from the original
+  70,000-record benchmark test split, selected with analysis seed 1001.
+- Individual-token attention: one output-independently selected record from
+  that same untouched-test reservoir, restricted to 20--30 valid tokens with
+  at least four tokens from each named field; layers L2 and L3 are reported.
+- Exploratory initialization sensitivity: the same eight seeds and final
+  routing outcomes used by the multi-seed comparison. Five simple initial-state
+  summaries are examined: title--content field-embedding distance,
+  mask-to-named-field-centroid distance, and the L3/L2 ratios of joint Q/K/V,
+  attention-output, and feed-forward weight norms. A one-update MSM probe also
+  records the SAAB-minus-Baseline changes in the L3/L2 joint-Q/K/V gradient and
+  AdamW-update ratios.
+- Robust initial-loss sensitivity: 256 fixed validation records divided into
+  four non-overlapping 64-record blocks, with dropout disabled and deterministic
+  MSM mask seeds 101, 202, 303, 404, and 505. The analysis reports per-mask and
+  per-block results, exclusion of the first 64 records, and leave-one-seed-out
+  descriptive correlations with final displacement.
+- Computational overhead: freshly initialized matched models at sequence
+  lengths 64, 128, and 256 with batch size 4 on an NVIDIA A100-SXM4-40GB GPU.
+  Measurements use float32 with automatic mixed precision and TF32 disabled,
+  five timed blocks, 20 inference iterations per block, and five complete
+  training-step iterations per block.
 
 ## Measurements
 
@@ -97,9 +126,26 @@ queries, heads, examples, and the selected evaluation batch. Attention entropy
 and field-to-field mass are computed from the same saved attention
 probabilities.
 
+The paired fixed-model analyses use the first 64 held-out validation examples,
+10,000 paired-bootstrap resamples, 20,000 paired sign-flip permutations, Holm
+correction across the four layers, and analysis seed 1001. These intervals and
+tests quantify variation across examples conditional on one trained model pair;
+they do not quantify variation across independently trained models.
+
+The length analysis separately selects 2,336 validation records per dataset by
+deterministic reservoir sampling. DBpedia uses its configured 256-token length;
+PubMed length associations use the configured 512-token evaluation. Exact-length
+standardization uses only token lengths observed in both datasets.
+
 When enabled, layer-gradient logging records the joint L2 norm of the Q, K,
 and V projection-weight gradients in every layer. These are gradients of the
 MSM cross-entropy objective, measured after gradient accumulation and before
 global gradient clipping. The reported L3/L2 ratio is the last-layer norm
 divided by the penultimate-layer norm. The norms describe magnitude, not
 gradient direction or the AdamW parameter-update magnitude.
+
+The individual-token diagnostic is qualitative. Record selection is independent
+of attention outputs, attention is averaged over all heads, and the result is
+not used as inferential evidence. The initialization analysis is likewise
+exploratory and descriptive over eight already-observed final outcomes; it is
+not a causal analysis or a validated predictor for new initializations.

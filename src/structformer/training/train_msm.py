@@ -44,7 +44,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "num_heads": 6,
         "ff_dim": 3072,
         "dropout": 0.2,
-        "casa_rank": 8,
         "scale_embeddings": False,
     },
     "training": {
@@ -166,7 +165,6 @@ def run_train_msm(config: dict[str, Any], *, run_dir: str | Path) -> Path:
         ff_dim=int(model_cfg["ff_dim"]),
         dropout=float(model_cfg["dropout"]),
         pad_token_id=int(data_cfg["pad_token_id"]),
-        casa_rank=int(model_cfg["casa_rank"]),
         scale_embeddings=bool(model_cfg.get("scale_embeddings", False)),
         saab_field_weight=float(model_cfg.get("saab_field_weight", 1.0)),
         saab_layer_mask=tuple(float(x) for x in model_cfg.get("saab_layer_mask", [])),
@@ -589,7 +587,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--train-jsonl", type=Path, default=None)
     parser.add_argument("--val-jsonl", type=Path, default=None)
     parser.add_argument("--tokenizer-json", type=Path, default=None)
-    parser.add_argument("--model", choices=["baseline", "saab", "casa"], default=None)
+    parser.add_argument("--model", choices=["baseline", "saab"], default=None)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--max-steps", type=int, default=None)
     parser.add_argument("--max-records", type=int, default=None)

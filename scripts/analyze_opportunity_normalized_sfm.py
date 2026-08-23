@@ -245,24 +245,41 @@ def _write_summary(path: Path, rows: list[dict[str, Any]]):
         writer.writerows(rows)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--analysis-dir", type=Path, required=True)
-    parser.add_argument("--dbpedia-zip", type=Path, required=True)
+    dbpedia_source = parser.add_mutually_exclusive_group(required=True)
+    dbpedia_source.add_argument(
+        "--dbpedia-validation-jsonl",
+        type=Path,
+        help="Prepared DBpedia validation JSONL used by the paired SFM analysis.",
+    )
+    dbpedia_source.add_argument(
+        "--dbpedia-zip",
+        type=Path,
+        help="Legacy archive containing data/processed/benchmark/dbpedia_msm/val.jsonl.",
+    )
     parser.add_argument("--pubmed-validation-jsonl", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--bootstrap-resamples", type=int, default=10_000)
     parser.add_argument("--permutations", type=int, default=20_000)
     parser.add_argument("--analysis-seed", type=int, default=1001)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+
+    dbpedia_loader = (
+        _load_jsonl_records
+        if args.dbpedia_validation_jsonl is not None
+        else _load_dbpedia_records
+    )
+    dbpedia_path = args.dbpedia_validation_jsonl or args.dbpedia_zip
 
     specifications = [
         (
             "DBpedia",
             args.analysis_dir / "dbpedia" / "per_example_sfm.csv",
             {3, 4},
-            _load_dbpedia_records,
-            args.dbpedia_zip,
+            dbpedia_loader,
+            dbpedia_path,
             "dbpedia_adjusted_per_example.csv",
         ),
         (

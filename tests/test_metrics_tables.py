@@ -52,8 +52,8 @@ class MetricsTableTests(unittest.TestCase):
             _write_metrics(
                 root / "run",
                 [
-                    {"task": "msm", "model": "casa", "seed": 42, "phase": "train", "split": "train", "step": 10, "loss": 0.9},
-                    {"task": "msm", "model": "casa", "seed": 42, "phase": "eval", "split": "val", "step": 10, "loss": 0.8, "accuracy": 0.7},
+                    {"task": "msm", "model": "saab", "seed": 42, "phase": "train", "split": "train", "step": 10, "loss": 0.9},
+                    {"task": "msm", "model": "saab", "seed": 42, "phase": "eval", "split": "val", "step": 10, "loss": 0.8, "accuracy": 0.7},
                 ],
             )
             out_dir = root / "tables"
@@ -64,7 +64,7 @@ class MetricsTableTests(unittest.TestCase):
             self.assertTrue((out_dir / "final_metrics.csv").exists())
             self.assertTrue((out_dir / "final_metrics.md").exists())
             self.assertTrue((out_dir / "step_metrics.csv").exists())
-            self.assertIn("casa", (out_dir / "final_metrics.md").read_text(encoding="utf-8"))
+            self.assertIn("saab", (out_dir / "final_metrics.md").read_text(encoding="utf-8"))
 
 
 def _write_metrics(run_dir: Path, rows: list[dict]) -> None:

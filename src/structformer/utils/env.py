@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass
 REQUIRED_PACKAGES = {
     "torch": "torch",
     "numpy": "numpy",
+    "matplotlib": "matplotlib",
     "pandas": "pandas",
     "pyyaml": "yaml",
     "scikit-learn": "sklearn",

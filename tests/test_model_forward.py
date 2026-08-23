@@ -28,7 +28,6 @@ def tiny_config(variant: str, *, head_type: str = "token", scale_embeddings: boo
         num_heads=4,
         ff_dim=32,
         dropout=0.0,
-        casa_rank=4,
         scale_embeddings=scale_embeddings,
     )
 
@@ -166,20 +165,6 @@ class ModelForwardTests(unittest.TestCase):
 
         self.assertTrue(torch.equal(shuffle.call_args.args[0], self.field_ids))
         self.assertTrue(torch.equal(shuffle.call_args.args[1], self.attention_mask))
-
-    def test_casa_forward_and_parameter_count(self):
-        config = tiny_config("casa")
-        model = StructuredTransformerModel(config)
-        model.eval()
-
-        output = model(self.input_ids, self.field_ids, attention_mask=self.attention_mask, need_weights=True)
-
-        self.assertEqual(tuple(output.logits.shape), (2, 4, 5))
-        self.assertEqual(len(output.structural_biases), 2)
-        self.assertEqual(tuple(output.structural_biases[0].shape), (2, 4, 4))
-
-        expected_per_layer = config.d_model * config.casa_rank + 2 * config.field_vocab_size * config.casa_rank + 1
-        self.assertEqual(model.parameter_count()["casa"], expected_per_layer * config.num_layers)
 
     def test_sequence_head_forward_shape(self):
         model = StructuredTransformerModel(tiny_config("baseline", head_type="sequence"))

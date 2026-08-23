@@ -6,13 +6,13 @@ from dataclasses import dataclass
 from typing import Literal
 
 
-ModelVariant = Literal["baseline", "saab", "casa"]
+ModelVariant = Literal["baseline", "saab"]
 HeadType = Literal["token", "sequence"]
 
 
 @dataclass(frozen=True)
 class TransformerConfig:
-    """Minimal model config shared by baseline, SAAB, and CASA."""
+    """Minimal model config shared by Baseline and SAAB."""
 
     vocab_size: int
     field_vocab_size: int
@@ -48,19 +48,17 @@ class TransformerConfig:
     saab_layer_mask: tuple[float, ...] = ()
 
     # Bias-content control: when True, the SAAB attention bias is built from a
-    # per-example permutation of field_ids instead of the true labels. The
-    # embeddings still receive the true field_ids, so no information or capacity
-    # is added or removed; only the grouping the bias rewards is randomized.
+    # per-example permutation of the field_ids supplied to the model. During MSM,
+    # these are already the masked input IDs. The embeddings still receive the
+    # unpermuted supplied field_ids, so no information or capacity is added or
+    # removed; only the grouping the bias rewards is randomized.
     # Tests whether displacement needs a bias aligned with real structure or is
     # triggered by any fixed block-shaped attention prior of the same strength.
     saab_shuffle_bias: bool = False
     saab_shuffle_seed: int = 0
 
-    casa_rank: int = 8
-    casa_lambda_init: float = 1.0
-
     def validate(self) -> None:
-        if self.variant not in {"baseline", "saab", "casa"}:
+        if self.variant not in {"baseline", "saab"}:
             raise ValueError(f"Unknown model variant: {self.variant}")
         if self.head_type not in {"token", "sequence"}:
             raise ValueError(f"Unknown head type: {self.head_type}")
@@ -74,8 +72,6 @@ class TransformerConfig:
             raise ValueError("max_length must be positive")
         if self.num_layers <= 0:
             raise ValueError("num_layers must be positive")
-        if self.casa_rank <= 0:
-            raise ValueError("casa_rank must be positive")
         if self.saab_layer_mask and len(self.saab_layer_mask) != self.num_layers:
             raise ValueError(
                 f"saab_layer_mask has {len(self.saab_layer_mask)} entries "

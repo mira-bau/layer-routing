@@ -1,7 +1,8 @@
 # How Structural Information Shapes Layer-wise Attention Routing in Transformers
 
-Reference implementation for the Baseline and Structure-Aware Attention Bias
-(SAAB) experiments reported in the accompanying manuscript.
+A PyTorch reference implementation for comparing standard Transformer
+attention with Structure-Aware Attention Bias (SAAB), with reproducible
+experiments on DBpedia and PubMed 200k RCT.
 
 ## Overview
 

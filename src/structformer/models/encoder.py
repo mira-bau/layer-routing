@@ -15,7 +15,7 @@ from structformer.models.config import TransformerConfig
 class EncoderOutput:
     hidden_states: torch.Tensor
     attentions: list[torch.Tensor] | None = None
-    structural_biases: list[torch.Tensor] | None = None
+    structural_biases: list[torch.Tensor | None] | None = None
 
 
 class TransformerEncoderLayer(nn.Module):
@@ -78,7 +78,7 @@ class TransformerEncoder(nn.Module):
         need_weights: bool = False,
     ) -> EncoderOutput:
         attentions: list[torch.Tensor] | None = [] if need_weights else None
-        structural_biases: list[torch.Tensor] | None = [] if need_weights else None
+        structural_biases: list[torch.Tensor | None] | None = [] if need_weights else None
 
         for i, layer in enumerate(self.layers):
             # Support both a single shared bias and a per-layer bias list.
@@ -97,7 +97,6 @@ class TransformerEncoder(nn.Module):
             if need_weights and attentions is not None and structural_biases is not None:
                 if attention is not None:
                     attentions.append(attention)
-                if structural_bias is not None:
-                    structural_biases.append(structural_bias)
+                structural_biases.append(structural_bias)
 
         return EncoderOutput(self.final_norm(hidden_states), attentions, structural_biases)

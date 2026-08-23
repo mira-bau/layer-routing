@@ -198,7 +198,6 @@ def _make_config(recipe: dict[str, Any], variant: str, vocab_size: int):
         field_vocab_size=int(data["field_vocab_size"]),
         max_length=int(data["max_length"]),
         variant=variant,
-        head_type="token",
         num_labels=int(data["num_labels"]),
         d_model=int(model["d_model"]),
         num_layers=int(model["num_layers"]),
@@ -360,6 +359,8 @@ def run(args: argparse.Namespace) -> Path:
 
     if args.device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is unavailable")
+    if args.device == "cpu" and not args.allow_cpu:
+        raise RuntimeError("CPU use requires the explicit --allow-cpu option")
     device = torch.device(args.device)
     recipe = yaml.safe_load(args.config.read_text(encoding="utf-8"))
     outcomes = _read_final_outcomes(args.final_outcomes_csv, args.seeds)
@@ -635,6 +636,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--probe-blocks", type=int, default=4)
     parser.add_argument("--vocab-size", type=int, default=30_000)
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+    parser.add_argument(
+        "--allow-cpu",
+        action="store_true",
+        help="Allow CPU for this bounded initialization diagnostic.",
+    )
     parser.add_argument("--skip-one-update", action="store_true")
     return parser
 

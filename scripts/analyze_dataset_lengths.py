@@ -1,10 +1,10 @@
 """Compare tokenized length distributions in prepared DBpedia and PubMed data.
 
-The script streams JSONL records directly, including DBpedia records stored in
-a ZIP archive. It reports observed post-preparation lengths. Because the
-prepared artifacts do not retain pre-truncation lengths, the fraction at the
-configured maximum is reported as maximum-length saturation, not as an exact
-truncation rate.
+The script streams JSONL records from the prepared dataset directories. It
+reports observed post-preparation lengths. Because the prepared records do not
+retain pre-truncation lengths, the fraction at the configured maximum is
+reported as maximum-length saturation, not as an exact truncation rate. A ZIP
+input remains accepted for compatibility with earlier local DBpedia archives.
 """
 
 from __future__ import annotations
@@ -163,8 +163,8 @@ def _read_dbpedia(
     return lengths_by_split, summaries, provenance
 
 
-def _read_pubmed(
-    prepared_dir: Path, splits: list[str]
+def _read_prepared_dir(
+    prepared_dir: Path, splits: list[str], *, dataset: str
 ) -> tuple[dict[str, list[int]], list[dict[str, Any]], dict[str, Any]]:
     manifest_path = prepared_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
@@ -186,7 +186,7 @@ def _read_pubmed(
 
         lengths, summary = _collect_lengths(
             _iter_jsonl(hashing_lines(), str(path)),
-            dataset="PubMed",
+            dataset=dataset,
             split=split,
             source=str(path),
             configured_max_length=int(manifest["max_length"]),
@@ -196,12 +196,24 @@ def _read_pubmed(
         lengths_by_split[split] = lengths
         summaries.append(summary)
     provenance = {
-        "dataset": "PubMed",
+        "dataset": dataset,
         "prepared_dir": str(prepared_dir),
         "file_sha256": file_hashes,
         "manifest": manifest,
     }
     return lengths_by_split, summaries, provenance
+
+
+def _read_pubmed(
+    prepared_dir: Path, splits: list[str]
+) -> tuple[dict[str, list[int]], list[dict[str, Any]], dict[str, Any]]:
+    return _read_prepared_dir(prepared_dir, splits, dataset="PubMed")
+
+
+def _read_dbpedia_dir(
+    prepared_dir: Path, splits: list[str]
+) -> tuple[dict[str, list[int]], list[dict[str, Any]], dict[str, Any]]:
+    return _read_prepared_dir(prepared_dir, splits, dataset="DBpedia")
 
 
 def _sha256_file(path: Path) -> str:
@@ -291,9 +303,14 @@ def run(args) -> Path:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     splits = list(args.splits)
-    dbpedia, dbpedia_summaries, dbpedia_provenance = _read_dbpedia(
-        Path(args.dbpedia_zip), splits
-    )
+    if args.dbpedia_prepared_dir is not None:
+        dbpedia, dbpedia_summaries, dbpedia_provenance = _read_dbpedia_dir(
+            Path(args.dbpedia_prepared_dir), splits
+        )
+    else:
+        dbpedia, dbpedia_summaries, dbpedia_provenance = _read_dbpedia(
+            Path(args.dbpedia_zip), splits
+        )
     pubmed, pubmed_summaries, pubmed_provenance = _read_pubmed(
         Path(args.pubmed_prepared_dir), splits
     )
@@ -336,7 +353,13 @@ def _parse_splits(value: str) -> list[str]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dbpedia-zip", type=Path, required=True)
+    dbpedia_source = parser.add_mutually_exclusive_group(required=True)
+    dbpedia_source.add_argument("--dbpedia-prepared-dir", type=Path)
+    dbpedia_source.add_argument(
+        "--dbpedia-zip",
+        type=Path,
+        help="Compatibility input for an archive containing prepared DBpedia files.",
+    )
     parser.add_argument("--pubmed-prepared-dir", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--splits", type=_parse_splits, default=["train", "val"])

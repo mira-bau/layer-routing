@@ -1,9 +1,9 @@
 """Run paired per-example SFM statistics and sequence-length analyses.
 
-This reviewer analysis evaluates exact seed-1001 Baseline/SAAB checkpoint pairs
-for DBpedia and PubMed. The first 64 validation records reproduce the submitted
-aggregate comparison for paired inference. A larger deterministic validation
-sample is used separately for length correlations and stratified summaries.
+This analysis evaluates exact seed-1001 Baseline/SAAB checkpoint pairs for
+DBpedia and PubMed. The first 64 validation records reproduce the primary
+aggregate comparison. A larger deterministic validation sample is used
+separately for length correlations and stratified summaries.
 """
 
 from __future__ import annotations
@@ -70,6 +70,14 @@ def _verify_checkpoint(checkpoint: dict[str, Any], spec: DatasetSpec, variant: s
         "learning_rate": 1.0e-4,
         "lr_schedule": "linear_warmup_cosine",
         "warmup_steps": 50,
+        "min_lr_ratio": 0.1,
+        "weight_decay": 0.01,
+        "betas": [0.9, 0.999],
+        "grad_clip": 1.0,
+        "mask_probability": 0.15,
+        "saab_field_weight": 1.0 if variant == "saab" else None,
+        "saab_layer_mask": [] if variant == "saab" else None,
+        "saab_shuffle_bias": False if variant == "saab" else None,
     }
     observed = {
         "variant": config.get("model"),
@@ -90,6 +98,20 @@ def _verify_checkpoint(checkpoint: dict[str, Any], spec: DatasetSpec, variant: s
         "learning_rate": training.get("learning_rate"),
         "lr_schedule": training.get("lr_schedule"),
         "warmup_steps": training.get("warmup_steps"),
+        "min_lr_ratio": training.get("min_lr_ratio"),
+        "weight_decay": training.get("weight_decay"),
+        "betas": training.get("betas"),
+        "grad_clip": training.get("grad_clip"),
+        "mask_probability": data.get("mask_probability"),
+        "saab_field_weight": (
+            model.get("saab_field_weight", 1.0) if variant == "saab" else None
+        ),
+        "saab_layer_mask": (
+            model.get("saab_layer_mask", []) if variant == "saab" else None
+        ),
+        "saab_shuffle_bias": (
+            model.get("saab_shuffle_bias", False) if variant == "saab" else None
+        ),
     }
     mismatches = {
         key: {"expected": expected[key], "observed": observed[key]}
@@ -495,8 +517,8 @@ def _evaluate_dataset(spec: DatasetSpec, args, device, out_dir: Path):
     )
     mask_field_id = int(baseline_checkpoint["config"]["data"]["mask_field_id"])
     named_fields = _field_ids(spec.field_vocab_json, mask_field_id)
-    submitted_diagnostic_max_length = 256
-    run_configured_sensitivity = spec.expected_max_length != submitted_diagnostic_max_length
+    primary_evaluation_max_length = 256
+    run_configured_sensitivity = spec.expected_max_length != primary_evaluation_max_length
 
     baseline_model = _rebuild_model(baseline_checkpoint, device)
     baseline = _evaluate_model(
@@ -507,7 +529,7 @@ def _evaluate_dataset(spec: DatasetSpec, args, device, out_dir: Path):
         device=device,
         dataset=spec.name,
         variant="baseline",
-        evaluation_max_length=submitted_diagnostic_max_length,
+        evaluation_max_length=primary_evaluation_max_length,
     )
     baseline_configured = (
         _evaluate_model(
@@ -536,7 +558,7 @@ def _evaluate_dataset(spec: DatasetSpec, args, device, out_dir: Path):
         device=device,
         dataset=spec.name,
         variant="saab",
-        evaluation_max_length=submitted_diagnostic_max_length,
+        evaluation_max_length=primary_evaluation_max_length,
     )
     saab_configured = (
         _evaluate_model(
@@ -563,7 +585,7 @@ def _evaluate_dataset(spec: DatasetSpec, args, device, out_dir: Path):
         length_indices,
         baseline,
         saab,
-        submitted_diagnostic_max_length,
+        primary_evaluation_max_length,
     )
     primary_rows = [row for row in rows if row["in_primary_first64"]]
     length_rows = [row for row in rows if row["in_length_sample"]]
@@ -615,7 +637,7 @@ def _evaluate_dataset(spec: DatasetSpec, args, device, out_dir: Path):
         "saab_checkpoint_sha256": _sha256(spec.saab_checkpoint),
         "checkpoint_step": spec.expected_step,
         "named_field_ids": named_fields,
-        "submitted_diagnostic_max_length": submitted_diagnostic_max_length,
+        "primary_evaluation_max_length": primary_evaluation_max_length,
         "configured_model_max_length": spec.expected_max_length,
         "configured_length_sensitivity_run": run_configured_sensitivity,
     }
@@ -662,7 +684,7 @@ def run(args) -> Path:
 
     if args.device == "cuda":
         if not torch.cuda.is_available():
-            raise RuntimeError("CUDA is required. Select a Colab GPU runtime.")
+            raise RuntimeError("CUDA was requested but is not available.")
         device = torch.device("cuda")
     elif args.device == "cpu" and args.allow_cpu:
         device = torch.device("cpu")
@@ -747,8 +769,8 @@ def run(args) -> Path:
             "length_analysis": (
                 f"Deterministic {args.length_sample_size}-example validation sample per dataset."
             ),
-            "submitted_diagnostic_length": (
-                "Both submitted aggregate diagnostics used a 256-token evaluation cap."
+            "primary_evaluation_length": (
+                "Both primary aggregate diagnostics use a 256-token evaluation cap."
             ),
             "pubmed_sensitivity": (
                 "The same PubMed examples are additionally evaluated at the configured "

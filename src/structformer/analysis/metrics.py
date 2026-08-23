@@ -30,7 +30,7 @@ def discover_run_dirs(paths: Iterable[str | Path]) -> list[Path]:
     """Return run directories containing `metrics.jsonl`.
 
     Each input path may be a run directory or a parent directory containing run
-    directories. Recursive discovery keeps Colab/local run layouts flexible.
+    directories. Recursive discovery keeps nested run layouts flexible.
     """
 
     discovered: list[Path] = []
@@ -148,4 +148,3 @@ def _format_markdown_value(value: Any) -> str:
     if isinstance(value, float):
         return f"{value:.6g}"
     return str(value).replace("|", "\\|")
-

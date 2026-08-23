@@ -109,7 +109,6 @@ def _make_model(torch_module, args, variant: str, max_length: int, device):
         field_vocab_size=args.field_vocab_size,
         max_length=max_length,
         variant=variant,
-        head_type="token",
         num_labels=args.num_labels,
         d_model=args.d_model,
         num_layers=args.num_layers,
@@ -368,7 +367,7 @@ def run(args) -> Path:
 
     if args.device == "cuda":
         if not torch.cuda.is_available():
-            raise RuntimeError("CUDA is required. In Colab select Runtime > Change runtime type > GPU.")
+            raise RuntimeError("CUDA was requested but is not available.")
         device = torch.device("cuda")
     elif args.device == "cpu" and args.allow_cpu:
         device = torch.device("cpu")

@@ -8,6 +8,7 @@ The reported training and evaluation runs recorded the following environment:
 - pandas 2.2.2
 - PyYAML 6.0.3
 - scikit-learn 1.6.1
+- SciPy 1.16.3
 - tokenizers 0.22.2
 - NVIDIA A100-SXM4-40GB
 - Linux with glibc 2.35
@@ -17,6 +18,12 @@ gradient scaling. No explicit TF32 override was applied to the training runs;
 both variants within a seed pair used the same numerical configuration. The
 computational-overhead benchmark separately disabled both cuDNN and matrix
 multiplication TF32.
+
+The bounded initialization-sensitivity reconstruction ran on CPU and records
+that device in its provenance. It is an offline diagnostic over freshly
+initialized models, not a paper-scale training run. Paper-scale training,
+checkpoint-based attention analyses, and the computational-overhead benchmark
+used CUDA.
 
 Install the PyTorch build manually using the instructions appropriate for the
 target CUDA runtime. The repository does not install or replace PyTorch. After

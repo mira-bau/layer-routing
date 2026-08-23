@@ -78,13 +78,14 @@ def _run_step_diagnostics(
     batch: dict[str, torch.Tensor],
     step: int,
     named_fields: dict[int, str],
+    device: torch.device,
 ) -> dict[str, Any]:
     """Run diagnostics for the paired models at one training step."""
     step_result: dict[str, Any] = {}
 
     for model_name, ckpt_path in ckpt_paths.items():
         ckpt  = _load_checkpoint(ckpt_path)
-        model = _rebuild_model(ckpt)
+        model = _rebuild_model(ckpt).to(device)
 
         field_ids = batch["field_ids"]
         attn_mask = batch["attention_mask"]
@@ -143,6 +144,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Optional field_vocab.json produced during data preparation.")
     parser.add_argument("--out-dir",   type=Path,
                         default=Path("runs/diagnostics/timeseries"))
+    parser.add_argument("--device", choices=["auto", "cuda", "mps", "cpu"], default="auto")
+    parser.add_argument("--allow-cpu", action="store_true")
     args = parser.parse_args(argv)
 
     # ── Discover checkpoints ──────────────────────────────────────────────────
@@ -179,6 +182,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nLoading {args.n_examples} examples from {args.val_jsonl}")
         batch = _load_real_examples(args.val_jsonl, args.n_examples)
 
+    from structformer.utils.device import DeviceError, select_device
+
+    try:
+        selected = select_device(args.device, allow_cpu=args.allow_cpu)
+    except DeviceError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    device = torch.device(selected.name)
+    batch = {name: tensor.to(device) for name, tensor in batch.items()}
+
     active_models = MODELS
     first_ckpt = _load_checkpoint(all_ckpts[active_models[0]][common_steps[0]])
     mask_field_id = int(first_ckpt["config"]["data"]["mask_field_id"])
@@ -206,6 +219,7 @@ def main(argv: list[str] | None = None) -> int:
             batch,
             step,
             named_fields,
+            device,
         )
         timeseries["by_step"][str(step)] = step_result
         _print_step_summary(step, step_result)

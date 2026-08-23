@@ -257,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
     dbpedia_source.add_argument(
         "--dbpedia-zip",
         type=Path,
-        help="Legacy archive containing data/processed/benchmark/dbpedia_msm/val.jsonl.",
+        help="Optional archive containing data/processed/benchmark/dbpedia_msm/val.jsonl.",
     )
     parser.add_argument("--pubmed-validation-jsonl", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)

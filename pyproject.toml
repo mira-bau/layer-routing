@@ -17,6 +17,7 @@ runtime = [
   "pandas",
   "pyyaml",
   "scikit-learn",
+  "scipy",
   "tokenizers",
 ]
 dev = [

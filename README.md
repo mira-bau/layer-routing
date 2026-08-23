@@ -91,9 +91,17 @@ Core scripts accept local input and output paths.
 
 The reported training and validation inputs were generated from the
 [`fancyzhx/dbpedia_14`](https://huggingface.co/datasets/fancyzhx/dbpedia_14)
-mirror of the DBpedia ontology-classification dataset. The preparation scripts
-expect CSV fields in `label,title,content` order and accept either a headerless
-file or a file with that header.
+mirror of the DBpedia ontology-classification dataset. That mirror is currently
+distributed as Parquet; export its training split locally as CSV with fields in
+`label,title,content` order before running the preparation scripts. The scripts
+accept either a headerless file or a file with that header and do not contact
+Hugging Face or download data.
+
+The original authors also provide the benchmark in a
+[`dbpedia_csv` distribution](https://github.com/zhangxiangxiao/Crepe/tree/master/data)
+with the same three-column layout. This is the source expected by the
+`/path/to/dbpedia_csv/*.csv` placeholders below and by the untouched-test
+confirmation.
 
 The original 560,000-record training split is divided deterministically into
 490,000 training records and 70,000 validation records using split seed 42.
@@ -157,6 +165,11 @@ PYTHONPATH=src python -m pytest -q
 The tests cover model parity, masked-ID handling, SAAB bias construction,
 deterministic data preparation, run logging, command generation, and the public
 analysis interfaces.
+
+For a two-step end-to-end smoke run with synthetic data, see the command in
+[REPRODUCE.md](REPRODUCE.md#quick-end-to-end-smoke-test). It is a software
+check only, not a paper-scale experiment, and uses the best locally available
+device (CUDA, then MPS, then explicitly allowed CPU).
 
 ## Citation
 

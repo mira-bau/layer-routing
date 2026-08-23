@@ -157,7 +157,6 @@ def run_train_msm(config: dict[str, Any], *, run_dir: str | Path) -> Path:
         field_vocab_size=int(data_cfg["field_vocab_size"]),
         max_length=int(data_cfg["max_length"]),
         variant=str(resolved["model"]),
-        head_type="token",
         num_labels=int(data_cfg["num_labels"]),
         d_model=int(model_cfg["d_model"]),
         num_layers=int(model_cfg["num_layers"]),

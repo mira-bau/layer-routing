@@ -10,9 +10,6 @@ import torch
 @dataclass(frozen=True)
 class SAABWeights:
     field: float = 1.0
-    entity: float = 1.0
-    value_type: float = 0.3
-    time: float = 0.5
 
 
 def _same_tag_bias(ids: torch.Tensor, weight: float) -> torch.Tensor:
@@ -68,9 +65,6 @@ def shuffle_field_ids_for_bias(
 def build_saab_bias(
     field_ids: torch.Tensor,
     *,
-    entity_ids: torch.Tensor | None = None,
-    value_type_ids: torch.Tensor | None = None,
-    time_ids: torch.Tensor | None = None,
     weights: SAABWeights | None = None,
 ) -> torch.Tensor:
     """Build the fixed SAAB pairwise structural bias.
@@ -81,10 +75,4 @@ def build_saab_bias(
 
     weights = weights or SAABWeights()
     bias = _same_tag_bias(field_ids, weights.field)
-    if entity_ids is not None:
-        bias = bias + _same_tag_bias(entity_ids, weights.entity)
-    if value_type_ids is not None:
-        bias = bias + _same_tag_bias(value_type_ids, weights.value_type)
-    if time_ids is not None:
-        bias = bias + _same_tag_bias(time_ids, weights.time)
     return bias.to(device=field_ids.device)

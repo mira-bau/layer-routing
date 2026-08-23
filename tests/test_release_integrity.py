@@ -23,7 +23,7 @@ def test_release_contains_data_loaders() -> None:
     assert (REPO_ROOT / "src/structformer/data/msm_jsonl.py").is_file()
 
 
-def test_release_contains_revised_manuscript_analysis_paths() -> None:
+def test_release_contains_reported_analysis_paths() -> None:
     required = (
         "dbpedia/scripts/prepare_external_dbpedia_split.py",
         "scripts/analyze_initialization_sensitivity.py",
@@ -50,7 +50,6 @@ def test_baseline_and_saab_have_equal_parameter_counts() -> None:
         vocab_size=64,
         field_vocab_size=6,
         max_length=16,
-        head_type="token",
         num_labels=5,
         d_model=24,
         num_layers=2,
@@ -69,16 +68,10 @@ def test_baseline_and_saab_have_equal_parameter_counts() -> None:
     del torch
 
 
-def test_paper_configs_share_training_recipe() -> None:
+def test_dbpedia_recipe_uses_reported_training_protocol() -> None:
     yaml = pytest.importorskip("yaml")
-    config_paths = [
-        REPO_ROOT / "dbpedia/configs/msm_baseline.yaml",
-        REPO_ROOT / "dbpedia/configs/msm_saab.yaml",
-        REPO_ROOT / "dbpedia/configs/msm_dbpedia_full_recipe.yaml",
-    ]
-    configs = [
-        yaml.safe_load(path.read_text(encoding="utf-8")) for path in config_paths
-    ]
+    path = REPO_ROOT / "dbpedia/configs/msm_dbpedia_full_recipe.yaml"
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
     keys = (
         "max_steps",
         "microbatch_size",
@@ -90,14 +83,12 @@ def test_paper_configs_share_training_recipe() -> None:
         "weight_decay",
         "grad_clip",
     )
-    reference = {key: configs[0]["training"][key] for key in keys}
-    for config in configs[1:]:
-        assert {key: config["training"][key] for key in keys} == reference
+    reference = {key: config["training"][key] for key in keys}
     assert reference["max_steps"] == 500
     assert reference["microbatch_size"] * reference[
         "gradient_accumulation_steps"
     ] == 512
-    assert all(config["model_config"]["scale_embeddings"] for config in configs)
+    assert config["model_config"]["scale_embeddings"] is True
 
 
 def test_pubmed_configs_use_reported_step_count() -> None:

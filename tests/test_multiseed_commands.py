@@ -51,13 +51,13 @@ def test_table_command_scans_multiseed_run_root() -> None:
         env_prefix="PYTHONPATH=src",
         run_root=Path("runs/dbpedia_multiseed"),
         table_out_dir=Path("outputs/tables/dbpedia_multiseed"),
-        steps="1,50,100,200,300,500",
+        steps="1,10,50,100,200,300,500",
     )
 
     assert "scripts/make_tables.py" in command
     assert "--runs runs/dbpedia_multiseed" in command
     assert "--out-dir outputs/tables/dbpedia_multiseed" in command
-    assert "--steps 1,50,100,200,300,500" in command
+    assert "--steps 1,10,50,100,200,300,500" in command
 
 
 def test_cli_prints_sixteen_paper_commands_and_table_command() -> None:

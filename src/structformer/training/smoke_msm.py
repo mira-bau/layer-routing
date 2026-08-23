@@ -85,7 +85,6 @@ def run_smoke_msm(config: dict[str, Any], *, run_dir: str | Path) -> Path:
         field_vocab_size=int(synthetic["field_vocab_size"]),
         max_length=int(synthetic["seq_len"]),
         variant=str(resolved["model"]),
-        head_type="token",
         num_labels=5,
         d_model=int(model_cfg["d_model"]),
         num_layers=int(model_cfg["num_layers"]),

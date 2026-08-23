@@ -15,14 +15,13 @@ if HAS_TORCH:
     from structformer.tasks.msm import MSM_IGNORE_INDEX, mask_field_ids
 
 
-def tiny_config(variant: str, *, head_type: str = "token", scale_embeddings: bool = False) -> "TransformerConfig":
+def tiny_config(variant: str, *, scale_embeddings: bool = False) -> "TransformerConfig":
     return TransformerConfig(
         vocab_size=32,
         field_vocab_size=6,
         max_length=8,
         variant=variant,
-        head_type=head_type,
-        num_labels=5 if head_type == "token" else 2,
+        num_labels=5,
         d_model=16,
         num_layers=2,
         num_heads=4,
@@ -59,6 +58,23 @@ class ModelForwardTests(unittest.TestCase):
         self.assertEqual(tuple(output.attentions[0].shape), (2, 4, 4, 4))
         self.assertEqual(len(output.structural_biases), 2)
         self.assertEqual(tuple(output.structural_biases[0].shape), (2, 4, 4))
+
+    def test_layer_restriction_biases_remain_layer_aligned(self):
+        model = StructuredTransformerModel(
+            replace(tiny_config("saab"), saab_layer_mask=(0.0, 1.0))
+        )
+        model.eval()
+
+        output = model(
+            self.input_ids,
+            self.field_ids,
+            attention_mask=self.attention_mask,
+            need_weights=True,
+        )
+
+        self.assertEqual(len(output.structural_biases), 2)
+        self.assertIsNone(output.structural_biases[0])
+        self.assertEqual(tuple(output.structural_biases[1].shape), (2, 4, 4))
 
     def test_baseline_and_saab_have_identical_seeded_initial_parameters(self):
         torch.manual_seed(1001)
@@ -165,14 +181,6 @@ class ModelForwardTests(unittest.TestCase):
 
         self.assertTrue(torch.equal(shuffle.call_args.args[0], self.field_ids))
         self.assertTrue(torch.equal(shuffle.call_args.args[1], self.attention_mask))
-
-    def test_sequence_head_forward_shape(self):
-        model = StructuredTransformerModel(tiny_config("baseline", head_type="sequence"))
-        model.eval()
-
-        output = model(self.input_ids, self.field_ids, attention_mask=self.attention_mask)
-
-        self.assertEqual(tuple(output.logits.shape), (2, 2))
 
     def test_embedding_scaling_is_opt_in(self):
         torch.manual_seed(123)

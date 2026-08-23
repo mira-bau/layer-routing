@@ -15,7 +15,7 @@ from structformer.models.bias import (
 from structformer.models.config import TransformerConfig
 from structformer.models.embeddings import StructuredEmbeddings
 from structformer.models.encoder import TransformerEncoder
-from structformer.models.heads import SequenceClassificationHead, TokenClassificationHead
+from structformer.models.heads import TokenClassificationHead
 
 
 @dataclass
@@ -23,7 +23,7 @@ class ModelOutput:
     logits: torch.Tensor
     hidden_states: torch.Tensor
     attentions: list[torch.Tensor] | None = None
-    structural_biases: list[torch.Tensor] | None = None
+    structural_biases: list[torch.Tensor | None] | None = None
 
 
 class StructuredTransformerModel(nn.Module):
@@ -36,10 +36,7 @@ class StructuredTransformerModel(nn.Module):
         self.embeddings = StructuredEmbeddings(config)
         self.encoder = TransformerEncoder(config)
 
-        if config.head_type == "token":
-            self.head = TokenClassificationHead(config.d_model, config.num_labels)
-        else:
-            self.head = SequenceClassificationHead(config.d_model, config.num_labels, config.dropout)
+        self.head = TokenClassificationHead(config.d_model, config.num_labels)
 
     def forward(
         self,
@@ -47,21 +44,12 @@ class StructuredTransformerModel(nn.Module):
         field_ids: torch.Tensor,
         *,
         attention_mask: torch.Tensor | None = None,
-        entity_ids: torch.Tensor | None = None,
-        value_type_ids: torch.Tensor | None = None,
-        time_ids: torch.Tensor | None = None,
         need_weights: bool = False,
     ) -> ModelOutput:
         if attention_mask is None:
             attention_mask = input_ids.ne(self.config.pad_token_id)
 
-        hidden_states = self.embeddings(
-            input_ids,
-            field_ids,
-            entity_ids=entity_ids,
-            value_type_ids=value_type_ids,
-            time_ids=time_ids,
-        )
+        hidden_states = self.embeddings(input_ids, field_ids)
 
         fixed_bias: torch.Tensor | list[torch.Tensor | None] | None = None
         if self.config.variant == "saab":
@@ -77,15 +65,7 @@ class StructuredTransformerModel(nn.Module):
                 )
             base_bias = build_saab_bias(
                 bias_field_ids,
-                entity_ids=entity_ids,
-                value_type_ids=value_type_ids,
-                time_ids=time_ids,
-                weights=SAABWeights(
-                    field=self.config.saab_field_weight,
-                    entity=self.config.saab_entity_weight,
-                    value_type=self.config.saab_value_type_weight,
-                    time=self.config.saab_time_weight,
-                ),
+                weights=SAABWeights(field=self.config.saab_field_weight),
             )
             if self.config.saab_layer_mask:
                 # Build one bias tensor per layer; None where the mask is zero

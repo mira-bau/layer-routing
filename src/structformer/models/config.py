@@ -7,7 +7,6 @@ from typing import Literal
 
 
 ModelVariant = Literal["baseline", "saab"]
-HeadType = Literal["token", "sequence"]
 
 
 @dataclass(frozen=True)
@@ -18,7 +17,6 @@ class TransformerConfig:
     field_vocab_size: int
     max_length: int
     variant: ModelVariant = "baseline"
-    head_type: HeadType = "token"
     num_labels: int = 2
 
     d_model: int = 768
@@ -28,16 +26,10 @@ class TransformerConfig:
     dropout: float = 0.2
     layer_norm_eps: float = 1e-5
 
-    entity_vocab_size: int = 0
-    value_type_vocab_size: int = 0
-    time_vocab_size: int = 0
     pad_token_id: int = 0
     scale_embeddings: bool = False
 
     saab_field_weight: float = 1.0
-    saab_entity_weight: float = 1.0
-    saab_value_type_weight: float = 0.3
-    saab_time_weight: float = 0.5
 
     # Per-layer bias mask for layer-restriction experiments.
     # Empty tuple (default) = uniform weight at every layer (saab_field_weight).
@@ -60,8 +52,6 @@ class TransformerConfig:
     def validate(self) -> None:
         if self.variant not in {"baseline", "saab"}:
             raise ValueError(f"Unknown model variant: {self.variant}")
-        if self.head_type not in {"token", "sequence"}:
-            raise ValueError(f"Unknown head type: {self.head_type}")
         if self.d_model % self.num_heads != 0:
             raise ValueError("d_model must be divisible by num_heads")
         if self.vocab_size <= 0:

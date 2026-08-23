@@ -4,6 +4,19 @@ Run all commands from the repository root with `PYTHONPATH=src`. Paths below
 are placeholders for locally prepared artifacts; the scripts do not download
 data.
 
+## Quick end-to-end smoke test
+
+This tiny synthetic run checks model construction, MSM masking, optimization,
+and artifact logging without downloading data. It is not a paper experiment:
+
+```bash
+PYTHONPATH=src python -m structformer.training.smoke_msm \
+  --config dbpedia/configs/smoke_msm.yaml \
+  --max-steps 2 \
+  --allow-cpu \
+  --run-dir runs/smoke
+```
+
 ## 1. Prepare the datasets
 
 ```bash
@@ -23,6 +36,17 @@ python pubmed/scripts/prepare_pubmed.py \
 ```
 
 Keep the generated manifests with the run artifacts.
+
+Summarize the post-tokenization length distributions reported for the prepared
+training and validation splits:
+
+```bash
+PYTHONPATH=src python scripts/analyze_dataset_lengths.py \
+  --dbpedia-prepared-dir /path/to/processed/dbpedia \
+  --pubmed-prepared-dir /path/to/processed/pubmed \
+  --splits train,val \
+  --out-dir outputs/dataset_lengths
+```
 
 ## 2. Run the eight-seed DBpedia comparison
 
@@ -72,6 +96,7 @@ PYTHONPATH=src python scripts/diag_timeseries.py \
   --val-jsonl /path/to/processed/dbpedia/val.jsonl \
   --field-vocab-json /path/to/processed/dbpedia/field_vocab.json \
   --n-examples 32 \
+  --device cuda \
   --out-dir outputs/timeseries/seed1001
 ```
 
@@ -299,6 +324,7 @@ PYTHONPATH=src python scripts/analyze_initialization_sensitivity.py \
   --probe-blocks 4 \
   --vocab-size 30000 \
   --device cpu \
+  --allow-cpu \
   --out-dir outputs/initialization_sensitivity
 ```
 

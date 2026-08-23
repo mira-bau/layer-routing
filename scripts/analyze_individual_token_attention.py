@@ -222,7 +222,7 @@ def _choose_device(requested: str, allow_cpu: bool):
 
     if requested == "cuda":
         if not torch.cuda.is_available():
-            raise RuntimeError("CUDA is unavailable. Select a Colab GPU runtime.")
+            raise RuntimeError("CUDA was requested but is not available.")
         return torch.device("cuda")
     if requested == "mps":
         if not torch.backends.mps.is_available():

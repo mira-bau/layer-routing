@@ -80,7 +80,7 @@ validation pass also performed when a run ends between these intervals.
 ## Reported experiment matrix
 
 - Eight-seed DBpedia comparison: 0, 7, 42, 99, 123, 256, 1001, 2024.
-- Training trajectory: seed 1001 at steps 1, 50, 100, 200, 300, 500.
+- Training trajectory: seed 1001 at steps 1, 10, 50, 100, 200, 300, 500.
 - MSM gradient comparison: seeds 42, 99, and 1001.
 - Bias-strength sweep:
   - seed 1001 at weights 0.0, 0.25, 0.5, 1.0, 2.0;

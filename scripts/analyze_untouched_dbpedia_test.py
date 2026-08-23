@@ -104,7 +104,7 @@ def run(args) -> Path:
     import torch
 
     if not torch.cuda.is_available():
-        raise RuntimeError("CUDA is required. Select a Colab GPU runtime.")
+        raise RuntimeError("CUDA is required for this paper-scale analysis.")
     device = torch.device("cuda")
     spec = DatasetSpec(
         "DBpedia-test",

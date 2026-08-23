@@ -10,7 +10,7 @@ from pathlib import Path
 
 DEFAULT_SEEDS = "0,7,42,99,123,256,1001,2024"
 DEFAULT_MODELS = "baseline,saab"
-DEFAULT_STEPS = "1,50,100,200,300,500"
+DEFAULT_STEPS = "1,10,50,100,200,300,500"
 VALID_MODELS = {"baseline", "saab"}
 
 

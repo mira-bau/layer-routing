@@ -4,6 +4,7 @@ numpy==2.0.2
 pandas==2.2.2
 PyYAML==6.0.3
 scikit-learn==1.6.1
+scipy==1.16.3
 tokenizers==0.22.2
 
 # Figure-generation dependency; its exact version was not captured in the

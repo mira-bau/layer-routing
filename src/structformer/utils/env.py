@@ -16,6 +16,7 @@ REQUIRED_PACKAGES = {
     "pandas": "pandas",
     "pyyaml": "yaml",
     "scikit-learn": "sklearn",
+    "scipy": "scipy",
     "tokenizers": "tokenizers",
 }
 

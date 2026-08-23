@@ -13,17 +13,18 @@ Outputs a JSON file and prints a human-readable summary.
 
 Usage (real data):
     PYTHONPATH=src python scripts/diag_attention.py \\
-        --baseline-ckpt colab-output/outputs/checkpoints/latest-baseline.pt \\
-        --saab-ckpt     colab-output/outputs/checkpoints/latest-saab.pt \\
-        --val-jsonl     data/processed/benchmark/dbpedia_msm/val.jsonl \\
+        --baseline-ckpt runs/dbpedia_multiseed/baseline_seed1001/checkpoints/latest.pt \\
+        --saab-ckpt     runs/dbpedia_multiseed/saab_seed1001/checkpoints/latest.pt \\
+        --val-jsonl     /path/to/processed/dbpedia/val.jsonl \\
         --n-examples    32 \\
-        --out-dir       runs/diagnostics/attention
+        --device         cuda \\
+        --out-dir        outputs/diagnostics/attention
 
 Usage (synthetic fallback, no val.jsonl needed):
     PYTHONPATH=src python scripts/diag_attention.py \\
-        --baseline-ckpt colab-output/outputs/checkpoints/latest-baseline.pt \\
-        --saab-ckpt     colab-output/outputs/checkpoints/latest-saab.pt \\
-        --synthetic
+        --baseline-ckpt runs/example/baseline/checkpoints/latest.pt \\
+        --saab-ckpt     runs/example/saab/checkpoints/latest.pt \\
+        --synthetic --device cpu --allow-cpu
 """
 
 from __future__ import annotations
@@ -68,7 +69,6 @@ def _rebuild_model(ckpt: dict[str, Any]) -> Any:
         field_vocab_size  = int(data["field_vocab_size"]),
         max_length        = int(data["max_length"]),
         variant           = str(cfg["model"]),
-        head_type         = "token",
         num_labels        = int(data["num_labels"]),
         d_model           = int(mc["d_model"]),
         num_layers        = int(mc["num_layers"]),
@@ -102,6 +102,8 @@ def _load_real_examples(val_jsonl: Path, n: int, max_length: int = 256) -> dict[
             if i >= n:
                 break
             records.append(json.loads(line))
+    if not records:
+        raise ValueError(f"No records found in {val_jsonl}")
 
     def _pad(seqs: list[list[int]], pad_val: int) -> torch.Tensor:
         length = max(len(s) for s in seqs)
@@ -114,7 +116,7 @@ def _load_real_examples(val_jsonl: Path, n: int, max_length: int = 256) -> dict[
 
     input_ids    = _pad([r["input_ids"]  for r in records], 0)
     field_ids    = _pad([r["field_ids"]  for r in records], 0)
-    attn_mask    = (input_ids != 0).long()
+    attn_mask    = _pad([r["attention_mask"] for r in records], 0).bool()
     return {"input_ids": input_ids, "field_ids": field_ids, "attention_mask": attn_mask}
 
 
@@ -306,8 +308,11 @@ def run_diagnostics(
     batch:            dict[str, torch.Tensor],
     out_dir:          Path,
     field_vocab_json: Path | None = None,
+    device: torch.device | None = None,
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
+    device = device or torch.device("cpu")
+    batch = {name: tensor.to(device) for name, tensor in batch.items()}
 
     all_results: dict[str, Any] = {}
 
@@ -320,7 +325,7 @@ def run_diagnostics(
     for variant, ckpt_path in ckpt_paths.items():
         print(f"\n── {variant} ({ckpt_path.name}) ──────────────────────────")
         ckpt  = _load_checkpoint(ckpt_path)
-        model = _rebuild_model(ckpt)
+        model = _rebuild_model(ckpt).to(device)
 
         field_ids    = batch["field_ids"]
         attn_mask    = batch["attention_mask"]
@@ -426,6 +431,8 @@ def main(argv: list[str] | None = None) -> int:
                              "If omitted, field names are auto-detected as 'field_<id>'.")
     parser.add_argument("--out-dir", type=Path,
                         default=Path("runs/diagnostics/attention"))
+    parser.add_argument("--device", choices=["auto", "cuda", "mps", "cpu"], default="auto")
+    parser.add_argument("--allow-cpu", action="store_true")
     args = parser.parse_args(argv)
 
     ckpt_paths = {
@@ -447,7 +454,20 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Loading {args.n_examples} examples from {args.val_jsonl}")
         batch = _load_real_examples(args.val_jsonl, args.n_examples)
 
-    run_diagnostics(ckpt_paths, batch, args.out_dir, args.field_vocab_json)
+    from structformer.utils.device import DeviceError, select_device
+
+    try:
+        selected = select_device(args.device, allow_cpu=args.allow_cpu)
+    except DeviceError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    run_diagnostics(
+        ckpt_paths,
+        batch,
+        args.out_dir,
+        args.field_vocab_json,
+        torch.device(selected.name),
+    )
     return 0
 
 

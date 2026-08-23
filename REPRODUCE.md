@@ -4,6 +4,39 @@ Run all commands from the repository root with `PYTHONPATH=src`. Paths below
 are placeholders for locally prepared artifacts; the scripts do not download
 data.
 
+Before starting, complete the installation and environment check in
+[README.md](README.md#installation). Paper-scale commands require locally
+supplied datasets and checkpoints; the repository intentionally contains
+neither. Keep Baseline and SAAB runs for a seed on the same device and do not
+change the shared recipe between the two variants.
+
+## Workflow and outputs at a glance
+
+| Manuscript analysis | Command or section | Primary generated output |
+| --- | --- | --- |
+| Environment and implementation check | Smoke test below | `runs/smoke/final_summary.json` |
+| Dataset length distribution | Section 1 | `outputs/dataset_lengths/length_summary.csv` |
+| Eight-seed DBpedia performance | Section 2 | `outputs/tables/dbpedia_multiseed/final_metrics.csv` |
+| Routing trajectory | Section 3 | `outputs/timeseries/seed*/timeseries_diagnostics.json` |
+| MSM gradient analysis | Section 3 | `outputs/gradients/seed*/gradient_checkpoint_summary.csv` |
+| Bias, placement, alignment, and depth controls | Sections 4–5 | One `attention_diagnostics.json` per completed pair |
+| PubMed comparison | Sections 6 and 8 | `outputs/paired_sfm/paired_primary_stats.csv` |
+| Eight-seed routing profiles | Section 10, first two commands | `outputs/dbpedia_final_sfm/final_sfm_by_seed.csv` |
+| Paired uncertainty and length analyses | Section 8 | `outputs/paired_sfm/analysis_summary.json` |
+| Opportunity and exact-length adjustments | Section 8 | `opportunity_adjusted_primary_stats.csv` and `length_standardization.json` |
+| Untouched DBpedia test and token-level figure | Section 9 | `analysis.json` and `individual_token_attention_candidate.pdf` |
+| Initialization sensitivity | Section 10 | `initialization_correlations.csv` |
+| Computational overhead | Section 11 | `baseline_saab_overhead.csv` |
+
+Resource categories:
+
+- `scripts/check_env.py`, tests, and the smoke run are short software checks.
+- Dataset preparation is CPU preprocessing.
+- Paper-scale training and checkpoint attention analysis target CUDA; the
+  reported environment used one NVIDIA A100-SXM4-40GB.
+- Statistical resampling scripts are post-processing, but their configured
+  bootstrap and permutation counts are intentionally substantial.
+
 ## Quick end-to-end smoke test
 
 This tiny synthetic run checks model construction, MSM masking, optimization,
@@ -18,6 +51,24 @@ PYTHONPATH=src python -m structformer.training.smoke_msm \
 ```
 
 ## 1. Prepare the datasets
+
+The examples use this local source layout:
+
+```text
+local-data/dbpedia_csv/train.csv
+local-data/dbpedia_csv/test.csv
+local-data/PubMed_200k_RCT/train.txt
+local-data/PubMed_200k_RCT/dev.txt
+```
+
+The DBpedia CSVs use `label,title,content` columns, with or without a header.
+If using the PubMed source repository, extract
+`PubMed_200k_RCT/train.7z` before continuing.
+
+```bash
+7z x local-data/PubMed_200k_RCT/train.7z \
+  -olocal-data/PubMed_200k_RCT
+```
 
 ```bash
 python dbpedia/scripts/split_dbpedia.py \
@@ -36,6 +87,22 @@ python pubmed/scripts/prepare_pubmed.py \
 ```
 
 Keep the generated manifests with the run artifacts.
+
+Successful preparation prints `Prepared ... MSM artifacts` and produces:
+
+```text
+/path/to/processed/{dbpedia,pubmed}/
+├── train.jsonl
+├── val.jsonl
+├── tokenizer.json
+├── field_vocab.json
+└── manifest.json
+```
+
+Before training, inspect both `manifest.json` files and confirm that the
+DBpedia split contains 490,000 training and 70,000 validation records, while
+the retained PubMed split contains 177,533 training and 2,336 validation
+records.
 
 Summarize the post-tokenization length distributions reported for the prepared
 training and validation splits:
@@ -148,6 +215,24 @@ PYTHONPATH=src python -m structformer.training.train_msm \
   --run-dir runs/restriction/saab_notL3_seed1001
 ```
 
+After each Baseline/control or Baseline/SAAB pair finishes, evaluate the fixed
+32-example routing batch with `scripts/diag_attention.py`. Substitute the pair's
+actual checkpoint and output paths:
+
+```bash
+PYTHONPATH=src python scripts/diag_attention.py \
+  --baseline-ckpt /path/to/baseline/checkpoints/latest.pt \
+  --saab-ckpt /path/to/comparison/checkpoints/latest.pt \
+  --val-jsonl /path/to/processed/dbpedia/val.jsonl \
+  --field-vocab-json /path/to/processed/dbpedia/field_vocab.json \
+  --n-examples 32 \
+  --device cuda \
+  --out-dir outputs/diagnostics/experiment_name
+```
+
+The table-ready layer values are in
+`outputs/diagnostics/experiment_name/attention_diagnostics.json`.
+
 ## 5. Run the depth experiment
 
 Use seeds 99 and 1001. Override the layer count, optimizer-step count, and
@@ -195,6 +280,27 @@ Repeat with `--model baseline` and the other seeds.
 Each run writes the resolved configuration, environment summary, data
 manifest, model and parameter summary, sample-batch debug output, JSONL/CSV
 metrics, and checkpoints. Preserve these files when archiving a reported run.
+
+A completed paper-scale run directory has at least:
+
+```text
+run-directory/
+├── resolved_config.json
+├── environment.json
+├── data_manifest.json
+├── model_summary.json
+├── sample_batch.json
+├── sample_rows.json
+├── metrics.jsonl
+├── metrics.csv
+├── final_summary.json
+└── checkpoints/
+    └── latest.pt
+```
+
+Runs requested with `--diagnostic-steps` also contain `step_XXXX.pt` files.
+Confirm `final_summary.json` reports the requested final step before using a
+checkpoint in an analysis.
 
 Use `scripts/diag_attention.py` for per-layer SFM, entropy, and field-to-field
 attention on paired final checkpoints. Use `scripts/make_tables.py` to collect
@@ -308,16 +414,40 @@ PYTHONPATH=src python scripts/analyze_individual_token_attention.py \
 
 ## 10. Exploratory initialization sensitivity
 
-Prepare a local CSV containing unrounded final SFM outcomes for the eight seed
-pairs. It may contain either `seed,delta_l2,delta_l3` or
-`seed,baseline_l2,baseline_l3,saab_l2,saab_l3`; an optional `pattern` column is
-retained for inspection. Then run:
+First compute the final, unrounded, 32-example attention diagnostics for all
+eight DBpedia seed pairs:
+
+```bash
+for seed in 0 7 42 99 123 256 1001 2024; do
+  PYTHONPATH=src python scripts/diag_attention.py \
+    --baseline-ckpt "runs/dbpedia_multiseed/baseline_seed${seed}/checkpoints/latest.pt" \
+    --saab-ckpt "runs/dbpedia_multiseed/saab_seed${seed}/checkpoints/latest.pt" \
+    --val-jsonl /path/to/processed/dbpedia/val.jsonl \
+    --field-vocab-json /path/to/processed/dbpedia/field_vocab.json \
+    --n-examples 32 \
+    --device cuda \
+    --out-dir "outputs/dbpedia_final_sfm/seed${seed}"
+done
+```
+
+Build the initialization-analysis input directly from those JSON files. The
+extractor verifies every seed, the four-layer shape, and checkpoint step 500:
+
+```bash
+PYTHONPATH=src python scripts/extract_final_sfm_outcomes.py \
+  --diagnostics-root outputs/dbpedia_final_sfm \
+  --seeds 0,7,42,99,123,256,1001,2024 \
+  --expected-step 500 \
+  --output outputs/dbpedia_final_sfm/final_sfm_by_seed.csv
+```
+
+Then run the bounded initialization analysis:
 
 ```bash
 PYTHONPATH=src python scripts/analyze_initialization_sensitivity.py \
   --config dbpedia/configs/msm_dbpedia_full_recipe.yaml \
   --validation-jsonl /path/to/processed/dbpedia/val.jsonl \
-  --final-outcomes-csv /path/to/local/final_sfm_by_seed.csv \
+  --final-outcomes-csv outputs/dbpedia_final_sfm/final_sfm_by_seed.csv \
   --seeds 0,7,42,99,123,256,1001,2024 \
   --mask-seeds 101,202,303,404,505 \
   --probe-examples 256 \
@@ -329,7 +459,9 @@ PYTHONPATH=src python scripts/analyze_initialization_sensitivity.py \
 ```
 
 This analysis is descriptive over the same eight final outcomes and is not a
-validated predictor for new initializations.
+validated predictor for new initializations. A successful run prints
+`initialization-sensitivity complete` and writes its main reported association
+to `outputs/initialization_sensitivity/initialization_correlations.csv`.
 
 ## 11. Computational-overhead benchmark
 
@@ -361,3 +493,16 @@ PYTHONPATH=src python scripts/benchmark_computational_overhead.py \
 All analysis outputs are local generated artifacts and remain excluded from the
 repository. Preserve their generated manifests and hash records with the local
 run archive.
+
+## Completion checklist
+
+A reproduction is internally complete when:
+
+- the environment check and test suite pass;
+- the dataset manifests contain the expected record counts;
+- each required Baseline/SAAB pair reached the same requested final step;
+- paired runs report identical trainable parameter counts and the intended
+  seed, data sample, masking, and optimizer settings;
+- every analysis command ends with its documented completion message and its
+  primary output from the workflow table exists; and
+- generated datasets, checkpoints, and results remain outside version control.

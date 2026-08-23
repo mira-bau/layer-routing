@@ -11,6 +11,7 @@ venv/
 
 # Datasets and generated artifacts (not committed; see README for sources)
 /data/
+/local-data/
 /dbpedia/data/
 /pubmed/data/
 /runs/

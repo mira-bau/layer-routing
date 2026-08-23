@@ -64,6 +64,9 @@ PyTorch build appropriate for the target system before installing the remaining
 dependencies:
 
 ```bash
+git clone https://github.com/mira-bau/layer-routing.git
+cd layer-routing
+
 python -m venv .venv
 source .venv/bin/activate
 
@@ -114,47 +117,104 @@ selection. The untouched-test confirmation uses the original authors'
 Use the files from the
 [PubMed 200k RCT repository](https://github.com/Franck-Dernoncourt/pubmed-rct).
 Preparation retains abstracts containing METHODS, RESULTS, and CONCLUSIONS and
-linearizes those fields in that order.
+linearizes those fields in that order. In the source repository, extract
+`PubMed_200k_RCT/train.7z` first so that `train.txt` sits beside `dev.txt`.
+For example, with the `7z` command installed:
 
-## Reproducing the experiments
+```bash
+7z x local-data/PubMed_200k_RCT/train.7z \
+  -olocal-data/PubMed_200k_RCT
+```
 
-Run commands from the repository root. Dataset preparation begins with:
+For the commands below, arrange the downloaded files as follows. The directory
+names are suggestions; the scripts accept any local paths.
+
+```text
+local-data/
+├── dbpedia_csv/
+│   ├── train.csv          # 560,000 records
+│   └── test.csv           # 70,000 records; used only for confirmation
+└── PubMed_200k_RCT/
+    ├── train.txt
+    └── dev.txt
+```
+
+## First-time workflow
+
+Run every command from the repository root.
+
+1. Confirm the environment and run the software checks:
+
+```bash
+python scripts/check_env.py
+PYTHONPATH=src python -m pytest -q
+PYTHONPATH=src python -m structformer.training.smoke_msm \
+  --config dbpedia/configs/smoke_msm.yaml \
+  --max-steps 2 \
+  --allow-cpu \
+  --run-dir runs/smoke
+```
+
+A successful smoke run ends with `Smoke run complete:` and creates
+`resolved_config.json`, `environment.json`, `model_summary.json`,
+`sample_batch.json`, `metrics.jsonl`, `metrics.csv`, and `final_summary.json`
+under `runs/smoke/`.
+
+2. Prepare the local datasets:
 
 ```bash
 python dbpedia/scripts/split_dbpedia.py \
-  --source-csv /path/to/dbpedia_csv/train.csv \
-  --out-dir /path/to/dbpedia-paper-split
+  --source-csv local-data/dbpedia_csv/train.csv \
+  --out-dir local-data/dbpedia-paper-split
 
 python dbpedia/scripts/prepare_dbpedia.py \
-  --train-csv /path/to/dbpedia-paper-split/train.csv \
-  --val-csv /path/to/dbpedia-paper-split/val.csv \
-  --out-dir /path/to/processed/dbpedia
+  --train-csv local-data/dbpedia-paper-split/train.csv \
+  --val-csv local-data/dbpedia-paper-split/val.csv \
+  --out-dir local-data/processed/dbpedia
 
 python pubmed/scripts/prepare_pubmed.py \
-  --train-txt /path/to/PubMed_200k_RCT/train.txt \
-  --val-txt /path/to/PubMed_200k_RCT/dev.txt \
-  --out-dir /path/to/processed/pubmed
+  --train-txt local-data/PubMed_200k_RCT/train.txt \
+  --val-txt local-data/PubMed_200k_RCT/dev.txt \
+  --out-dir local-data/processed/pubmed
 ```
 
-The eight-seed DBpedia command generator emits the 16 matched Baseline/SAAB
-training commands using seeds `0, 7, 42, 99, 123, 256, 1001, 2024`:
+Each processed dataset directory should contain `train.jsonl`, `val.jsonl`,
+`tokenizer.json`, `field_vocab.json`, and `manifest.json`. DBpedia split
+generation also creates `train.csv`, `val.csv`, and `split_manifest.json` in
+`local-data/dbpedia-paper-split/`.
+
+3. Generate the paper-scale DBpedia commands:
 
 ```bash
 python dbpedia/scripts/multiseed_commands.py \
-  --train-jsonl /path/to/processed/dbpedia/train.jsonl \
-  --val-jsonl /path/to/processed/dbpedia/val.jsonl \
-  --tokenizer-json /path/to/processed/dbpedia/tokenizer.json
+  --train-jsonl local-data/processed/dbpedia/train.jsonl \
+  --val-jsonl local-data/processed/dbpedia/val.jsonl \
+  --tokenizer-json local-data/processed/dbpedia/tokenizer.json
 ```
 
-Run each generated training command in a fresh process. Do not modify the shared
-recipe between paired model variants. See [REPRODUCE.md](REPRODUCE.md) for the
-PubMed runs, ablations, checkpoint diagnostics, paired statistical analyses,
-untouched-test confirmation, initialization analysis, and overhead benchmark.
+The generator prints 16 matched Baseline/SAAB commands for seeds
+`0, 7, 42, 99, 123, 256, 1001, 2024`. Run each command in a fresh process and
+do not modify the shared recipe between paired variants. A completed run ends
+with `MSM run complete:` and writes its final checkpoint to
+`checkpoints/latest.pt`.
+
+4. Continue with [REPRODUCE.md](REPRODUCE.md), which maps each remaining
+command and output file to the corresponding manuscript analysis.
 
 Each training run writes an inspectable local record containing its resolved
 configuration, environment summary, data manifest, model summary, sample-batch
 debug output, metrics, and checkpoints. Generated artifacts are excluded from
 version control.
+
+## Resource expectations
+
+- Environment checks, tests, and the synthetic smoke run are short local
+  software checks; CPU is permitted only when explicitly requested.
+- Dataset preparation is CPU preprocessing and does not train a model.
+- Paper-scale training, checkpoint attention analysis, and the overhead
+  benchmark target CUDA. The reported runs used one NVIDIA A100-SXM4-40GB.
+- The full study contains many paired runs. Verify one generated Baseline/SAAB
+  pair before scheduling the complete seed and ablation matrix.
 
 ## Tests
 

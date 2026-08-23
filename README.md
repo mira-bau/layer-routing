@@ -1,74 +1,115 @@
 # How Structural Information Shapes Layer-wise Attention Routing in Transformers
 
 Reference implementation for the Baseline and Structure-Aware Attention Bias
-(SAAB) experiments reported in the paper.
+(SAAB) experiments reported in the accompanying manuscript.
 
-This repository compares two Transformers with the same visible field-ID inputs, backbone, prediction head, field embeddings, and
-learnable parameter count. The Baseline receives field information through its
-input embeddings. SAAB additionally constructs a fixed pairwise relation from
-the visible post-masking field IDs and adds it to the attention logits. Both models
-are trained with Masked Structure Modeling (MSM), which masks field labels and
-asks the model to recover them.
+## Overview
 
-The implementation includes the paper’s training variants and compact
-diagnostics for same-field mass (SFM), attention entropy, field-to-field
-attention, and MSM loss-gradient norms. See
-[PAPER_EXPERIMENT_SPEC.md](PAPER_EXPERIMENT_SPEC.md) for the exact method and
-[REPRODUCE.md](REPRODUCE.md) for the complete command sequence. The exact
-recorded software and hardware environment is documented in
-[PAPER_ENVIRONMENT.md](PAPER_ENVIRONMENT.md).
+This repository studies whether changing how field information is made
+available to attention alters layer-wise routing in a Transformer. It compares
+two models with matched field-ID inputs, embeddings, Transformer backbone,
+prediction head, trainable parameter count, and optimization protocol:
 
-## Repository layout
+- **Baseline:** field IDs are supplied through learned field embeddings.
+- **SAAB:** the same field IDs are embedded and additionally converted into a
+  fixed pairwise same-field bias added to the attention logits.
+
+Both models are trained with Masked Structure Modeling (MSM), a self-supervised
+objective that masks selected field IDs while leaving token content visible and
+asks the model to recover the original field labels. During MSM, both the field
+embeddings and the SAAB bias receive the same post-masking field-ID tensor.
+
+The implementation supports the reported DBpedia and PubMed experiments,
+including same-field mass (SFM), attention entropy, field-to-field routing,
+MSM loss-gradient measurements, paired uncertainty analyses, routing controls,
+initialization sensitivity, and computational-overhead measurements.
+
+## Scope of the release
+
+This is a scripts-only research release. It includes the source code,
+experiment configurations, preprocessing utilities, analysis scripts, tests,
+and reproduction instructions required to regenerate the reported analyses
+from locally supplied inputs.
+
+Datasets, processed inputs, trained checkpoints, run directories, notebooks,
+and generated result files are intentionally not distributed in this
+repository.
+
+## Documentation
+
+- [Paper experiment specification](PAPER_EXPERIMENT_SPEC.md): model, data,
+  training, evaluation, and analysis semantics.
+- [Reproduction guide](REPRODUCE.md): complete commands for the reported
+  experiments and analyses.
+- [Reported environment](PAPER_ENVIRONMENT.md): software versions, hardware,
+  and numerical settings recorded for the paper runs.
+
+## Repository structure
 
 ```text
-src/structformer/       shared model, task, data, training, and metric code
+src/structformer/       model, task, data, training, logging, and metric code
 dbpedia/configs/        paper-scale DBpedia configurations
-dbpedia/scripts/        deterministic split, preparation, and run generation
+dbpedia/scripts/        DBpedia splitting, preparation, and command generation
 pubmed/configs/         paper-scale PubMed configurations
 pubmed/scripts/         PubMed preparation
-scripts/                environment, table, attention, and gradient analysis
-tests/                  release and correctness checks
+scripts/                diagnostics and statistical analysis
+tests/                  correctness and release-integrity tests
 ```
 
 ## Installation
 
 Python 3.10 or newer is required. Use an isolated environment and install the
-PyTorch build appropriate for the machine before installing the remaining
+PyTorch build appropriate for the target system before installing the remaining
 dependencies:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 
-# Install the appropriate PyTorch build from https://pytorch.org/get-started/locally/
+# Install the appropriate PyTorch build from:
+# https://pytorch.org/get-started/locally/
+
 pip install -e ".[runtime,dev]"
 python scripts/check_env.py
 ```
 
-For strict reconstruction of the recorded non-PyTorch package environment, use
+To reconstruct the recorded non-PyTorch environment, install
 `requirements-paper.txt` after manually installing the reported PyTorch/CUDA
-build. The file does not install or replace PyTorch.
+build. Neither the project metadata nor its scripts install or replace PyTorch.
 
 Training selects CUDA first and Apple MPS second. CPU training is rejected by
-default; `--allow-cpu` is intended only for tests and tiny smoke runs. The
-paper-scale runs were designed for CUDA.
+default. The `--allow-cpu` option is restricted to tests, diagnostic development,
+and tiny smoke runs; final paper-scale runs are intended for CUDA.
 
-## Datasets
+## Data
 
-The datasets are public but are not downloaded or redistributed by this
-repository.
+The datasets are publicly available but are not downloaded automatically.
+Core scripts accept local input and output paths.
 
-- **DBpedia ontology classification:** use the original benchmark files from
-  [Crepe](https://github.com/zhangxiangxiao/Crepe), or the equivalent
-  [DBpedia 14 dataset mirror](https://huggingface.co/datasets/fancyzhx/dbpedia_14).
-  The expected CSV order is `label,title,content`; the original headerless CSV
-  and an equivalent CSV with this header are both accepted.
-- **PubMed 200k RCT:** use the files from the
-  [official dataset repository](https://github.com/Franck-Dernoncourt/pubmed-rct).
+### DBpedia
 
-The DBpedia experiments divide the original 560,000-example training split into
-490,000 training examples and 70,000 validation examples with a deterministic
-random split using seed 42. The benchmark test split is excluded from training, validation, and checkpoint selection; it is reserved for the documented untouched confirmatory analysis:
+The reported training and validation inputs were generated from the
+[`fancyzhx/dbpedia_14`](https://huggingface.co/datasets/fancyzhx/dbpedia_14)
+mirror of the DBpedia ontology-classification dataset. The preparation scripts
+expect CSV fields in `label,title,content` order and accept either a headerless
+file or a file with that header.
+
+The original 560,000-record training split is divided deterministically into
+490,000 training records and 70,000 validation records using split seed 42.
+The benchmark test split is excluded from training, validation, and checkpoint
+selection. The untouched-test confirmation uses the original authors'
+`dbpedia_csv/test.csv` distribution and the tokenizer retained from training.
+
+### PubMed 200k RCT
+
+Use the files from the
+[PubMed 200k RCT repository](https://github.com/Franck-Dernoncourt/pubmed-rct).
+Preparation retains abstracts containing METHODS, RESULTS, and CONCLUSIONS and
+linearizes those fields in that order.
+
+## Reproducing the experiments
+
+Run commands from the repository root. Dataset preparation begins with:
 
 ```bash
 python dbpedia/scripts/split_dbpedia.py \
@@ -79,49 +120,15 @@ python dbpedia/scripts/prepare_dbpedia.py \
   --train-csv /path/to/dbpedia-paper-split/train.csv \
   --val-csv /path/to/dbpedia-paper-split/val.csv \
   --out-dir /path/to/processed/dbpedia
-```
 
-Prepare PubMed from its standard `LABEL<TAB>sentence` files:
-
-```bash
 python pubmed/scripts/prepare_pubmed.py \
   --train-txt /path/to/PubMed_200k_RCT/train.txt \
   --val-txt /path/to/PubMed_200k_RCT/dev.txt \
   --out-dir /path/to/processed/pubmed
 ```
 
-The PubMed preparation retains abstracts containing METHODS, RESULTS, and
-CONCLUSIONS, then linearizes those fields in that order. The reported PubMed
-runs use 1500 optimization steps, with validation and checkpointing every 500
-steps.
-
-## Main DBpedia comparison
-
-Use one shared recipe and override only the model variant, seed, data paths,
-and output directory:
-
-```bash
-PYTHONPATH=src python -m structformer.training.train_msm \
-  --config dbpedia/configs/msm_dbpedia_full_recipe.yaml \
-  --model baseline \
-  --seed 1001 \
-  --train-jsonl /path/to/processed/dbpedia/train.jsonl \
-  --val-jsonl /path/to/processed/dbpedia/val.jsonl \
-  --tokenizer-json /path/to/processed/dbpedia/tokenizer.json \
-  --run-dir runs/dbpedia_seed1001/baseline
-
-PYTHONPATH=src python -m structformer.training.train_msm \
-  --config dbpedia/configs/msm_dbpedia_full_recipe.yaml \
-  --model saab \
-  --seed 1001 \
-  --train-jsonl /path/to/processed/dbpedia/train.jsonl \
-  --val-jsonl /path/to/processed/dbpedia/val.jsonl \
-  --tokenizer-json /path/to/processed/dbpedia/tokenizer.json \
-  --run-dir runs/dbpedia_seed1001/saab
-```
-
-The eight-seed command generator defaults to the paper’s seeds
-`0, 7, 42, 99, 123, 256, 1001, 2024`:
+The eight-seed DBpedia command generator emits the 16 matched Baseline/SAAB
+training commands using seeds `0, 7, 42, 99, 123, 256, 1001, 2024`:
 
 ```bash
 python dbpedia/scripts/multiseed_commands.py \
@@ -130,39 +137,25 @@ python dbpedia/scripts/multiseed_commands.py \
   --tokenizer-json /path/to/processed/dbpedia/tokenizer.json
 ```
 
-## MSM gradient measurement
+Run each generated training command in a fresh process. Do not modify the shared
+recipe between paired model variants. See [REPRODUCE.md](REPRODUCE.md) for the
+PubMed runs, ablations, checkpoint diagnostics, paired statistical analyses,
+untouched-test confirmation, initialization analysis, and overhead benchmark.
 
-Enable `--log-layer-gradients` during a run to record the joint Q/K/V
-projection-weight gradient norm for each layer. The value is taken from the
-MSM cross-entropy loss after gradient accumulation and before global gradient
-clipping:
-
-```bash
-PYTHONPATH=src python -m structformer.training.train_msm \
-  --config dbpedia/configs/msm_dbpedia_full_recipe.yaml \
-  --model saab \
-  --seed 1001 \
-  --train-jsonl /path/to/processed/dbpedia/train.jsonl \
-  --val-jsonl /path/to/processed/dbpedia/val.jsonl \
-  --tokenizer-json /path/to/processed/dbpedia/tokenizer.json \
-  --log-layer-gradients \
-  --run-dir runs/gradients/saab_seed1001
-
-PYTHONPATH=src python scripts/analyze_training_gradients.py \
-  --run-root runs/gradients \
-  --seed 1001 \
-  --out-dir outputs/gradients/seed1001
-```
-
-The analyzer rejects logs produced from another objective or measurement
-point. Gradient norms measure magnitude, not gradient direction or the AdamW
-parameter update.
+Each training run writes an inspectable local record containing its resolved
+configuration, environment summary, data manifest, model summary, sample-batch
+debug output, metrics, and checkpoints. Generated artifacts are excluded from
+version control.
 
 ## Tests
 
 ```bash
-PYTHONPATH=src pytest -q
+PYTHONPATH=src python -m pytest -q
 ```
+
+The tests cover model parity, masked-ID handling, SAAB bias construction,
+deterministic data preparation, run logging, command generation, and the public
+analysis interfaces.
 
 ## Citation
 
@@ -175,6 +168,8 @@ PYTHONPATH=src pytest -q
 }
 ```
 
+Update the citation with the final journal metadata and DOI after publication.
+
 ## License
 
-Released under the MIT License. See [LICENSE](LICENSE).
+Released under the [MIT License](LICENSE).

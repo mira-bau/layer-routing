@@ -1,4 +1,4 @@
-# How Structural Information Shapes Layer-wise Attention Routing in Transformers
+# How Attention-Level Access to Structural Information Shapes Layer-wise Attention Routing in Transformers
 
 A PyTorch reference implementation for comparing standard Transformer
 attention with Structure-Aware Attention Bias (SAAB), with reproducible
@@ -235,10 +235,10 @@ device (CUDA, then MPS, then explicitly allowed CPU).
 
 ```bibtex
 @unpublished{benamara2026saab,
-  title  = {How Structural Information Shapes Layer-wise Attention Routing in Transformers},
+  title  = {How Attention-Level Access to Structural Information Shapes Layer-wise Attention Routing in Transformers},
   author = {Benamara, Amira and Sadeghzadeh, Arezoo and Kahraman, Fatih},
   year   = {2026},
-  note   = {Manuscript under review}
+  note   = {Accepted for publication}
 }
 ```
 
